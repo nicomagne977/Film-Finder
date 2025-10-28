@@ -1,0 +1,24 @@
+{
+  "users": [
+    {
+      "id": 1,
+      "username": "admin01",
+      "first_name": "Alice",
+      "last_name": "Admin",
+      "email": "alice.admin@example.com",
+      "password_hash": "hash_admin123",
+      "role": "admin",
+      "created_at": "2025-10-28T12:00:00"
+    },
+    {
+      "id": 2,
+      "username": "user01",
+      "first_name": "Bob",
+      "last_name": "User",
+      "email": "bob.user@example.com",
+      "password_hash": "hash_user123",
+      "role": "user",
+      "created_at": "2025-10-28T12:05:00"
+    }
+  ]
+}

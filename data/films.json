@@ -1,0 +1,40 @@
+{
+  "films": [
+    {
+      "id": 1,
+      "title": "Action Movie",
+      "genre": "Action",
+      "release_date": "2025-01-15",
+      "poster_path": "assets/posters/action_movie.jpg",
+      "trailer_url": "https://example.com/videos/action_movie.mp4",
+      "description": "Un film plein d'action et de cascades.",
+      "approved": true,
+      "added_by_user_id": 1,
+      "logs": [{ "date": "2025-10-28T12:30:00", "action": "ajouté", "user_id": 1 }]
+    },
+    {
+      "id": 2,
+      "title": "Comedy Movie",
+      "genre": "Comédie",
+      "release_date": "2025-02-20",
+      "poster_path": "assets/posters/comedy_movie.jpg",
+      "trailer_url": "https://example.com/videos/comedy_movie.mp4",
+      "description": "Un film drôle pour toute la famille.",
+      "approved": true,
+      "added_by_user_id": 1,
+      "logs": [{ "date": "2025-10-28T12:40:00", "action": "ajouté", "user_id": 1 }]
+    },
+    {
+      "id": 3,
+      "title": "New Proposed Movie",
+      "genre": "Drama",
+      "release_date": "2025-10-10",
+      "poster_path": "assets/posters/drama_movie.jpg",
+      "trailer_url": "https://example.com/videos/drama_movie.mp4",
+      "description": "Film proposé par un utilisateur, en attente de validation.",
+      "approved": false,
+      "added_by_user_id": 2,
+      "logs": [{ "date": "2025-10-28T13:00:00", "action": "proposé", "user_id": 2 }]
+    }
+  ]
+}

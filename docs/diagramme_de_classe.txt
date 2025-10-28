@@ -1,0 +1,90 @@
+@startuml
+title Diagramme de classes final - Film Finder (JSON, Admin, Logs, Validation)
+
+' =====================
+' === Classes métier ===
+' =====================
+
+class User {
+    - id : int
+    - first_name : str
+    - last_name : str
+    - email : str
+    - username : str
+    - password_hash : str
+    - created_at : datetime
+    --
+    + get_full_name() : str
+    + check_password_rules(password: str) : bool
+    + verify_password(password: str) : bool
+    + propose_film(f: Film) : bool
+}
+
+class Admin {
+    - admin_level : int
+    --
+    + create_film(f: Film) : bool
+    + validate_film(f: Film) : bool
+    + update_film(f: Film) : bool
+    + delete_film(film_id: int) : bool
+    + manage_user(user_id: int, action: str) : bool
+}
+
+class Film {
+    - id : int
+    - title : str
+    - genre : str
+    - release_date : date
+    - poster_path : str
+    - trailer_url : str
+    - description : str
+    - approved : bool
+    - added_by_user_id : int
+    - logs : list
+    --
+    + matches_filter(title: str = null, genre: str = null, date: date = null) : bool
+    + add_log(action: str, user_id: int) : void
+}
+
+' =====================
+' === Contrôleurs / Services ===
+' =====================
+
+class AuthController {
+    - current_user : User
+    --
+    + register_user(username: str, email: str, password: str) : User
+    + login_user(email: str, password: str) : User
+    + logout() : void
+}
+
+class FilmController {
+    - films : List<Film>
+    --
+    + add_film(film: Film, by_user: User) : bool
+    + delete_film(film_id: int, by_admin: Admin) : bool
+    + update_film(film: Film, by_admin: Admin) : bool
+    + validate_film(film_id: int, by_admin: Admin) : bool
+    + search_films(title: str = null, genre: str = null, date: date = null) : List<Film>
+}
+
+' =====================
+' === Relations et héritage ===
+' =====================
+
+' Héritage : User -> Admin
+User <|-- Admin
+
+' Un utilisateur peut proposer plusieurs films
+User "1" -- "0..*" Film : "propose >"
+
+' FilmController contient et gère les films
+FilmController "1" o-- "0..*" Film : "films"
+
+' Admin utilise FilmController pour gérer/valider les films
+Admin --> FilmController : "utilise pour gérer/valider"
+
+' AuthController utilise User
+AuthController --> User : "utilise"
+
+@enduml

@@ -1,0 +1,41 @@
+@startuml
+title Diagramme de Cas d'Utilisation - Film Finder
+
+actor "Utilisateur" as User
+actor "Administrateur" as Admin
+
+rectangle "Film Finder" {
+
+    (S'inscrire) as UC_Register
+    (Se connecter) as UC_Login
+    (Se déconnecter) as UC_Logout
+    (Rechercher un film) as UC_Search
+    (Voir les détails d’un film) as UC_ViewDetails
+    (Voir la bande-annonce) as UC_ViewTrailer
+
+    (Ajouter un film) as UC_AddFilm
+    (Modifier un film) as UC_UpdateFilm
+    (Supprimer un film) as UC_DeleteFilm
+    (Gérer les utilisateurs) as UC_ManageUsers
+}
+
+' --- Relations Utilisateur ---
+User --> UC_Register
+User --> UC_Login
+User --> UC_Logout
+User --> UC_Search
+User --> UC_ViewDetails
+User --> UC_ViewTrailer
+
+' --- Relations Administrateur ---
+Admin --> UC_AddFilm
+Admin --> UC_UpdateFilm
+Admin --> UC_DeleteFilm
+Admin --> UC_ManageUsers
+
+' --- Relations internes entre cas d'utilisation ---
+UC_ViewDetails --> UC_ViewTrailer : <<include>>
+UC_Login --> UC_Search : <<extend>>
+UC_Search --> UC_ViewDetails : <<extend>>
+
+@enduml
