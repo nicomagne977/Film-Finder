@@ -2,23 +2,13 @@
   "users": [
     {
       "id": 1,
-      "username": "admin01",
-      "first_name": "Alice",
-      "last_name": "Admin",
-      "email": "alice.admin@example.com",
-      "password_hash": "hash_admin123",
-      "role": "admin",
-      "created_at": "2025-10-28T12:00:00"
-    },
-    {
-      "id": 2,
-      "username": "user01",
-      "first_name": "Bob",
-      "last_name": "User",
-      "email": "bob.user@example.com",
-      "password_hash": "hash_user123",
-      "role": "user",
-      "created_at": "2025-10-28T12:05:00"
+      "first_name": "Jean",
+      "last_name": "Dupont",
+      "email": "jean@email.com",
+      "username": "jdupont",
+      "password_hash": "46708f23d682fef9aa996ecbb139bfb6c9ffdc039905ad6ad5c85a88b9411d97",
+      "created_at": "2025-10-29T01:45:45.294177"
     }
-  ]
+  ],
+  "last_updated": "2025-10-29T01:45:45.297302"
 }

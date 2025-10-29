@@ -1,101 +1,174 @@
+from datetime import datetime, date
+from typing import Optional, List, Dict, Any
 import json
-import os
 
-class Films:
-    """Using this class to manage film information in the application with file json
-    respecting class diagramm in docs/diagramme_de_classe.txt.
-    Class Diagram:class Film {
-    attributes:
-    - id : int
-    - title : str
-    - director : str
-    - release_year : int
-    - genre : str
-    - duration_minutes : int
-    - rating : float
-    --
-    methods:
-    + get_summary() : str
-    + is_classic() : bool
-}"""
+class Film:
+    def __init__(self, id: int, title: str, genre: str, release_date: date,
+                 poster_path: str = "", trailer_url: str = "", description: str = "",
+                 approved: bool = False, added_by_user_id: int = 0,
+                 logs: Optional[List[Dict]] = None):
+        self.id = id
+        self.title = title
+        self.genre = genre
+        self.release_date = release_date
+        self.poster_path = poster_path
+        self.trailer_url = trailer_url
+        self.description = description
+        self.approved = approved
+        self.added_by_user_id = added_by_user_id
+        self.logs = logs or []
 
-    def __init__(self, json_file='films.json'):
-        self.json_file = json_file
-        self.films = self.load_films()
+    def matches_filter(self, title: Optional[str] = None, genre: Optional[str] = None,
+                      date_filter: Optional[date] = None) -> bool:
+        """
+        Vérifie si le film correspond aux critères de recherche
+        """
+        # Filtre par titre (recherche partielle, insensible à la casse)
+        if title and title.lower() not in self.title.lower():
+            return False
 
-    def load_films(self):
-        """Load films from a JSON file."""
-        if not os.path.exists(self.json_file):
-            return []
-        with open(self.json_file, 'r') as file:
-            return json.load(file)
+        # Filtre par genre (exact match, insensible à la casse)
+        if genre and genre.lower() != self.genre.lower():
+            return False
 
-    def save_films(self):
-        """Save films to a JSON file."""
-        with open(self.json_file, 'w') as file:
-            json.dump(self.films, file, indent=4)
-    def add_film(self, film):
-        """Add a new film to the collection."""
-        self.films.append(film)
-        self.save_films()
-    def get_film_by_id(self, film_id):
-        """Retrieve a film by its ID."""
-        for film in self.films:
-            if film['id'] == film_id:
-                return film
-        return None
-    def remove_film(self, film_id):
-        """Remove a film by its ID."""
-        self.films = [film for film in self.films if film['id'] != film_id]
-        self.save_films()
-    def update_film(self, film_id, updated_info):
-        """Update film information by its ID."""
-        for film in self.films:
-            if film['id'] == film_id:
-                film.update(updated_info)
-                self.save_films()
-                return True
+        # Filtre par date (année seulement ou date complète)
+        if date_filter:
+            if isinstance(date_filter, date):
+                # Si une date complète est fournie, comparaison exacte
+                if self.release_date != date_filter:
+                    return False
+            else:
+                # Si seulement l'année est fournie
+                if self.release_date.year != date_filter:
+                    return False
+
+        return True
+
+    def add_log(self, action: str, user_id: int) -> None:
+        """
+        Ajoute une entrée de log pour le film
+        """
+        log_entry = {
+            'action': action,
+            'user_id': user_id,
+            'timestamp': datetime.now().isoformat(),
+            'film_id': self.id
+        }
+        self.logs.append(log_entry)
+
+        # Garder seulement les 100 derniers logs pour éviter la surcharge
+        if len(self.logs) > 100:
+            self.logs = self.logs[-100:]
+
+    def approve(self, admin_id: int) -> None:
+        """Approuve le film et ajoute un log"""
+        self.approved = True
+        self.add_log("approved", admin_id)
+
+    def reject(self, admin_id: int) -> None:
+        """Rejette le film et ajoute un log"""
+        self.approved = False
+        self.add_log("rejected", admin_id)
+
+    def update_info(self, title: Optional[str] = None, genre: Optional[str] = None,
+                   release_date: Optional[date] = None, poster_path: Optional[str] = None,
+                   trailer_url: Optional[str] = None, description: Optional[str] = None,
+                   user_id: int = 0) -> bool:
+        """
+        Met à jour les informations du film et ajoute un log
+        Retourne True si des modifications ont été faites
+        """
+        modifications = []
+
+        if title and title != self.title:
+            modifications.append(f"title: {self.title} -> {title}")
+            self.title = title
+
+        if genre and genre != self.genre:
+            modifications.append(f"genre: {self.genre} -> {genre}")
+            self.genre = genre
+
+        if release_date and release_date != self.release_date:
+            modifications.append(f"release_date: {self.release_date} -> {release_date}")
+            self.release_date = release_date
+
+        if poster_path is not None and poster_path != self.poster_path:
+            modifications.append(f"poster_path updated")
+            self.poster_path = poster_path
+
+        if trailer_url is not None and trailer_url != self.trailer_url:
+            modifications.append(f"trailer_url updated")
+            self.trailer_url = trailer_url
+
+        if description is not None and description != self.description:
+            modifications.append(f"description updated")
+            self.description = description
+
+        if modifications:
+            modification_text = ", ".join(modifications)
+            self.add_log(f"updated: {modification_text}", user_id)
+            return True
+
         return False
-    def list_films(self):
-        """List all films in the collection."""
-        return self.films
-    def find_films_by_genre(self, genre):
-        """Find films by genre."""
-        return [film for film in self.films if film['genre'].lower() == genre.lower()]
-    def find_films_by_director(self, director):
-        """Find films by director."""
-        return [film for film in self.films if film['director'].lower() == director.lower()]
-    def find_films_by_release_year(self, year):
-        """Find films by release year."""
-        return [film for film in self.films if film['release_year'] == year]
-    def get_top_rated_films(self, top_n=10):
-        """Get top N rated films."""
-        sorted_films = sorted(self.films, key=lambda x: x['rating'], reverse=True)
-        return sorted_films[:top_n]
-    def get_classic_films(self, year_threshold=25):
-        """Get films older than a certain number of years."""
-        current_year = 2024  # Update this as needed
-        return [film for film in self.films if current_year - film['release_year'] >= year_threshold]
 
-    def get_film_summary(self, film_id):
-        """Get a summary of a film by its ID."""
-        film = self.get_film_by_id(film_id)
-        if film:
-            return f"{film['title']} ({film['release_year']}), directed by {film['director']}. Genre: {film['genre']}, Duration: {film['duration_minutes']} minutes, Rating: {film['rating']}/10"
-        return "Film not found."
+    def get_recent_logs(self, limit: int = 10) -> List[Dict]:
+        """Retourne les logs les plus récents"""
+        return sorted(self.logs, key=lambda x: x['timestamp'], reverse=True)[:limit]
 
-    def is_classic(self, film_id, year_threshold=25):
-        """Check if a film is considered a classic based on its release year."""
-        film = self.get_film_by_id(film_id)
-        if film:
-            current_year = 2024  # Update this as needed
-            return current_year - film['release_year'] >= year_threshold
-        return False
-    def clear_films(self):
-        """Clear all films from the collection."""
-        self.films = []
-        self.save_films()
+    def to_dict(self) -> Dict[str, Any]:
+        """Convertit le film en dictionnaire pour stockage JSON"""
+        return {
+            'id': self.id,
+            'title': self.title,
+            'genre': self.genre,
+            'release_date': self.release_date.isoformat(),
+            'poster_path': self.poster_path,
+            'trailer_url': self.trailer_url,
+            'description': self.description,
+            'approved': self.approved,
+            'added_by_user_id': self.added_by_user_id,
+            'logs': self.logs
+        }
 
-# Example usage:
-# films_manager = Films()
-# films_manager.add_film({
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> 'Film':
+        """Crée un film à partir d'un dictionnaire"""
+        # Conversion de la date de sortie
+        release_date = date.fromisoformat(data['release_date']) if isinstance(data['release_date'], str) else data['release_date']
+
+        return cls(
+            id=data['id'],
+            title=data['title'],
+            genre=data['genre'],
+            release_date=release_date,
+            poster_path=data.get('poster_path', ''),
+            trailer_url=data.get('trailer_url', ''),
+            description=data.get('description', ''),
+            approved=data.get('approved', False),
+            added_by_user_id=data.get('added_by_user_id', 0),
+            logs=data.get('logs', [])
+        )
+
+    def __str__(self) -> str:
+        status = "✓" if self.approved else "⏳"
+        return f"Film({self.id}) {status} '{self.title}' ({self.release_date.year}) - {self.genre}"
+
+    def __repr__(self) -> str:
+        return self.__str__()
+
+    def __eq__(self, other) -> bool:
+        """Deux films sont égaux s'ils ont le même ID"""
+        if not isinstance(other, Film):
+            return False
+        return self.id == other.id
+
+    def get_age(self) -> int:
+        """Retourne l'âge du film en années"""
+        today = date.today()
+        return today.year - self.release_date.year - (
+            (today.month, today.day) < (self.release_date.month, self.release_date.day)
+        )
+
+    def is_recent(self, years: int = 2) -> bool:
+        """Vérifie si le film est récent (par défaut moins de 2 ans)"""
+        return self.get_age() <= years
