@@ -55,17 +55,17 @@ film_finder/
 ## ⚙️ Tâches principales à faire
 
 1. **Backend Auth**
-   - [ ] Implémenter `User` et `Admin` avec héritage
-   - [ ] Vérification mot de passe sécurisé
-   - [ ] `AuthController` avec `register`, `login`, `logout`
+   - [x] Implémenter `User` et `Admin` avec héritage
+   - [x] Vérification mot de passe sécurisé
+   - [x] `AuthController` avec `register`, `login`, `logout`
    - [ ] Tests unitaires pour l’authentification
-   - [ ] Gestion des sessions utilisateurs
+   - [x] Gestion des sessions utilisateurs
 2. **Backend Films**
-   - [ ] Implémenter `Film` avec `approved`, `added_by_user_id`, `logs`
-   - [ ] `FilmController` : ajout, validation, modification, suppression
+   - [x] Implémenter `Film` avec `approved`, `added_by_user_id`, `logs`
+   - [x] `FilmController` : ajout, validation, modification, suppression
    - [ ] Vérifier les doublons avant ajout
-   - [ ] Historique des actions (logs)
-   - [ ] Recherche par titre, genre, date
+   - [x] Historique des actions (logs)
+   - [x] Recherche par titre, genre, date
 3. **Persistance JSON**
    - [ ] Lire/écrire `users.json` et `films.json` avec backup
    - [ ] Sauvegarde automatique après chaque modification

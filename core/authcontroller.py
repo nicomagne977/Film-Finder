@@ -33,6 +33,16 @@ class AuthController:
     def _save_users(self) -> bool:
         """Sauvegarde les utilisateurs dans le fichier JSON"""
         try:
+            # If NO_AUTO_SAVE is set, skip saving to avoid accidental overwrites
+            if os.environ.get('NO_AUTO_SAVE') == '1':
+                # Log the attempted save for debugging
+                try:
+                    os.makedirs(os.path.dirname(self.users_file), exist_ok=True)
+                    with open(os.path.join(os.path.dirname(self.users_file), 'save_log.txt'), 'a', encoding='utf-8') as logf:
+                        logf.write(f"SKIP SAVE_USERS {self.users_file} at {datetime.now().isoformat()}\n")
+                except Exception:
+                    pass
+                return False
             # Créer le dossier si nécessaire
             os.makedirs(os.path.dirname(self.users_file), exist_ok=True)
 
@@ -43,7 +53,12 @@ class AuthController:
 
             with open(self.users_file, 'w', encoding='utf-8') as f:
                 json.dump(data, f, indent=2, ensure_ascii=False)
-
+            # Log successful save
+            try:
+                with open(os.path.join(os.path.dirname(self.users_file), 'save_log.txt'), 'a', encoding='utf-8') as logf:
+                    logf.write(f"SAVE_USERS {self.users_file} at {datetime.now().isoformat()}\n")
+            except Exception:
+                pass
             return True
         except Exception as e:
             print(f"Erreur sauvegarde utilisateurs: {e}")

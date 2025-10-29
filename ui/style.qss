@@ -1,0 +1,105 @@
+/* Style QSS central pour Film Finder - responsive-friendly */
+
+/* Global font & background */
+* {
+  font-family: "Segoe UI", "Arial", sans-serif;
+}
+QWidget {
+  background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+            stop:0 #f6f8ff, stop:1 #eef6ff);
+  color: #222;
+}
+
+/* Title */
+QLabel#titleLabel {
+  font-size: 20px;
+  font-weight: 700;
+}
+
+QFrame#formFrame {
+  background: qlineargradient(x1:0,y1:0,x2:0,y2:1, stop:0 #ffffff, stop:1 #f0f6ff);
+  border: 1px solid #dbe6f5;
+  border-radius: 8px;
+  padding: 12px;
+}
+
+QTabWidget::pane {
+  background: #ffffff;
+  border: 1px solid #dbe6f5;
+  border-radius: 6px;
+}
+
+QTabBar::tab {
+  background: transparent;
+  padding: 8px 12px;
+  border-top-left-radius: 6px;
+  border-top-right-radius: 6px;
+}
+
+QTabBar::tab:selected {
+  background: #e8f2ff;
+  color: #003366;
+}
+
+/* Buttons */
+QPushButton {
+  background-color: #007bff;
+  color: white;
+  border: none;
+  padding: 8px 12px;
+  border-radius: 6px;
+}
+QPushButton:hover {
+  background-color: #0056b3;
+}
+QPushButton:disabled {
+  background-color: #9bb8e8;
+}
+
+/* Secondary buttons (green) */
+QPushButton[secondary="true"] {
+  background-color: #28a745;
+}
+QPushButton[secondary="true"]:hover {
+  background-color: #1e7e34;
+}
+
+/* Flat toggle link */
+QPushButton[flat="true"] {
+  background: transparent;
+  color: #007bff;
+  text-decoration: underline;
+}
+
+/* Input fields */
+QLineEdit, QTextEdit {
+  background: white;
+  border: 1px solid #d0d7e6;
+  border-radius: 6px;
+  padding: 6px;
+}
+
+/* List widget look */
+QListWidget {
+  background: white;
+  border: 1px solid #dbe6f5;
+  border-radius: 6px;
+}
+QListWidget::item:selected {
+  background: #e6f0ff;
+}
+
+/* Scrollbars */
+QScrollBar:vertical {
+  background: transparent;
+  width: 10px;
+}
+QScrollBar::handle:vertical {
+  background: #cbdff9;
+  border-radius: 4px;
+}
+
+/* Make fonts slightly larger on high DPI */
+@media screen and (min-resolution: 120dpi) {
+  QWidget { font-size: 11pt; }
+}

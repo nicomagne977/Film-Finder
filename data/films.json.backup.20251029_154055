@@ -1,0 +1,26 @@
+{
+  "films": [
+    {
+      "id": 1,
+      "title": "Inception",
+      "genre": "Science-Fiction",
+      "release_date": "2010-07-16",
+      "poster_path": "",
+      "trailer_url": "",
+      "description": "Un voleur qui s'infiltre dans les rêves.",
+      "approved": false,
+      "added_by_user_id": 1,
+      "logs": [
+        {
+          "action": "proposed",
+          "user_id": 1,
+          "timestamp": "2025-10-29T15:40:55.597651",
+          "film_id": 1
+        }
+      ]
+    }
+  ],
+  "last_updated": "2025-10-29T15:40:55.612077",
+  "total_films": 1,
+  "approved_films": 0
+}

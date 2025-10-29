@@ -8,7 +8,16 @@
       "username": "jdupont",
       "password_hash": "46708f23d682fef9aa996ecbb139bfb6c9ffdc039905ad6ad5c85a88b9411d97",
       "created_at": "2025-10-29T01:45:45.294177"
+    },
+    {
+      "id": 2,
+      "first_name": "Nico",
+      "last_name": "Jean",
+      "email": "jeannico@gmail.com",
+      "username": "Jean",
+      "password_hash": "46708f23d682fef9aa996ecbb139bfb6c9ffdc039905ad6ad5c85a88b9411d97",
+      "created_at": "2025-10-29T18:09:44.151834"
     }
   ],
-  "last_updated": "2025-10-29T01:45:45.297302"
+  "last_updated": "2025-10-29T18:09:44.209782"
 }

@@ -28,6 +28,15 @@ class FilmController:
     def _save_films(self) -> bool:
         """Sauvegarde les films dans le fichier JSON"""
         try:
+            # If NO_AUTO_SAVE is set, skip saving to avoid accidental overwrites
+            if os.environ.get('NO_AUTO_SAVE') == '1':
+                try:
+                    os.makedirs(os.path.dirname(self.films_file), exist_ok=True)
+                    with open(os.path.join(os.path.dirname(self.films_file), 'save_log.txt'), 'a', encoding='utf-8') as logf:
+                        logf.write(f"SKIP SAVE_FILMS {self.films_file} at {datetime.now().isoformat()}\n")
+                except Exception:
+                    pass
+                return False
             # Créer le dossier si nécessaire
             os.makedirs(os.path.dirname(self.films_file), exist_ok=True)
 
@@ -45,6 +54,13 @@ class FilmController:
 
             with open(self.films_file, 'w', encoding='utf-8') as f:
                 json.dump(data, f, indent=2, ensure_ascii=False)
+
+            # Log successful save
+            try:
+                with open(os.path.join(os.path.dirname(self.films_file), 'save_log.txt'), 'a', encoding='utf-8') as logf:
+                    logf.write(f"SAVE_FILMS {self.films_file} at {datetime.now().isoformat()}\n")
+            except Exception:
+                pass
 
             return True
         except Exception as e:
