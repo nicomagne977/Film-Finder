@@ -99,7 +99,4 @@ QScrollBar::handle:vertical {
   border-radius: 4px;
 }
 
-/* Make fonts slightly larger on high DPI */
-@media screen and (min-resolution: 120dpi) {
-  QWidget { font-size: 11pt; }
-}
+/* Remove unsupported @media queries (Qt QSS doesn't support media queries). */

@@ -39,13 +39,13 @@ class LoginWindow(QMainWindow):
 
         # Logo/Titre
         title_label = QLabel("🎬 Film Finder")
-    title_label.setObjectName('titleLabel')
+        title_label.setObjectName('titleLabel')
         title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         title_label.setFont(QFont("Arial", 24, QFont.Weight.Bold))
 
         # Frame du formulaire
         form_frame = QFrame()
-    form_frame.setObjectName('formFrame')
+        form_frame.setObjectName('formFrame')
         form_frame.setFrameStyle(QFrame.Shape.StyledPanel)
         form_layout = QVBoxLayout()
         form_layout.setSpacing(15)
@@ -115,9 +115,9 @@ class LoginWindow(QMainWindow):
         self.toggle_mode_button = QPushButton("Je n'ai pas de compte")
         self.toggle_mode_button.setFlat(True)
         self.toggle_mode_button.setStyleSheet("color: #007bff;")
-    # expose properties for QSS
-    self.register_button.setProperty('secondary', True)
-    self.toggle_mode_button.setProperty('flat', True)
+        # expose properties for QSS
+        self.register_button.setProperty('secondary', True)
+        self.toggle_mode_button.setProperty('flat', True)
         # Taille et comportement responsive
         self.login_button.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self.register_button.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)

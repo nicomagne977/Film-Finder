@@ -149,6 +149,39 @@ class FilmController:
             print(f"Erreur suppression film: {e}")
             return False
 
+    def withdraw_film(self, film_id: int, by_user: User) -> bool:
+        """
+        Permet à l'utilisateur de retirer sa proposition de film tant qu'elle n'est pas validée.
+        """
+        try:
+            film = self.get_film_by_id(film_id)
+            if not film:
+                print("Film non trouvé")
+                return False
+
+            if film.approved:
+                print("Impossible de retirer un film déjà approuvé")
+                return False
+
+            if film.added_by_user_id != by_user.id:
+                print("Permission refusée: film ajouté par un autre utilisateur")
+                return False
+
+            film.add_log("withdrawn", by_user.id)
+            self.films = [f for f in self.films if f.id != film_id]
+
+            if self._save_films():
+                print(f"Film '{film.title}' retiré par {by_user.username}")
+                return True
+            else:
+                # rollback
+                self.films.append(film)
+                return False
+
+        except Exception as e:
+            print(f"Erreur retrait film: {e}")
+            return False
+
     def update_film(self, film_id: int, updates: Dict[str, Any], by_admin: Admin) -> bool:
         """
         Met à jour un film (admin seulement)
