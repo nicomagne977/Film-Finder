@@ -37,6 +37,22 @@ def main():
                 login.hide()
             except Exception:
                 pass
+            # When main window emits logout, show login again
+            def _on_logout():
+                try:
+                    mw.close()
+                except Exception:
+                    pass
+                try:
+                    # reset or show login window
+                    login.show()
+                except Exception:
+                    pass
+
+            try:
+                mw.logout_signal.connect(_on_logout)
+            except Exception:
+                pass
 
         login.login_success.connect(_on_login)
         login.show()

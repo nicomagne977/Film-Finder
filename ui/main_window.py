@@ -5,16 +5,610 @@ from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QLabel, QLineEdit, QPushButton, QListWidget, QListWidgetItem,
     QMessageBox, QTabWidget, QTextEdit, QDialog, QDialogButtonBox,
-    QSizePolicy, QFormLayout, QComboBox, QDateEdit
+    QSizePolicy, QFormLayout, QComboBox, QDateEdit, QGridLayout, QScrollArea,
+    QFrame
 )
-from PyQt5.QtCore import Qt, QDate
-from PyQt5.QtGui import QFont, QPixmap
+from PyQt5.QtCore import Qt, QDate, QSize, pyqtSignal, QUrl, QPropertyAnimation, QEasingCurve, pyqtProperty, QTimer
+try:
+    from PyQt5.QtMultimedia import QMediaPlayer, QMediaContent
+    from PyQt5.QtMultimediaWidgets import QVideoWidget
+    HAVE_VIDEO = True
+except Exception:
+    HAVE_VIDEO = False
+from PyQt5.QtGui import QFont, QPixmap, QIcon, QPainter, QPainterPath, QColor, QBrush
 
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
 from core.filmcontroller import FilmController
 from core.admins import Admin
 
+class NetflixPosterCard(QLabel):
+    """Carte de poster style Netflix avec animations au hover"""
+
+    clicked = pyqtSignal(object)
+
+    def __init__(self, film, width=180, height=270, parent=None):
+        super().__init__(parent)
+        self.film = film
+        self.width = width
+        self.height = height
+        self._scale = 1.0
+
+        # Animations
+        self.scale_animation = QPropertyAnimation(self, b"scale")
+        self.scale_animation.setDuration(200)
+        self.scale_animation.setEasingCurve(QEasingCurve.OutCubic)
+
+        self.setFixedSize(width, height)
+        self.setScaledContents(True)
+        self.setStyleSheet("""
+            NetflixPosterCard {
+                border-radius: 8px;
+                background-color: #2d2d2d;
+            }
+        """)
+
+        self.load_poster()
+
+    def load_poster(self):
+        """Charge l'image du poster"""
+        poster_path = getattr(self.film, 'poster_path', '')
+        placeholder_text = self.film.title if hasattr(self.film, 'title') else 'No Poster'
+
+        if poster_path and os.path.exists(poster_path):
+            pixmap = QPixmap(poster_path)
+        else:
+            # Créer un placeholder
+            pixmap = QPixmap(self.width, self.height)
+            pixmap.fill(QColor('#2d2d2d'))
+
+            painter = QPainter(pixmap)
+            painter.setPen(QColor('#666666'))
+            painter.setFont(QFont('Arial', 10, QFont.Weight.Bold))
+            painter.drawText(pixmap.rect(), Qt.AlignmentFlag.AlignCenter, placeholder_text)
+            painter.end()
+
+        # Appliquer des coins arrondis
+        rounded_pixmap = self._make_rounded_pixmap(pixmap, 8)
+        self.setPixmap(rounded_pixmap)
+
+    def _make_rounded_pixmap(self, pixmap, radius):
+        """Crée un pixmap avec coins arrondis"""
+        scaled_pixmap = pixmap.scaled(self.width, self.height, Qt.KeepAspectRatioByExpanding, Qt.SmoothTransformation)
+        rounded_pixmap = QPixmap(self.width, self.height)
+        rounded_pixmap.fill(Qt.transparent)
+
+        painter = QPainter(rounded_pixmap)
+        painter.setRenderHint(QPainter.Antialiasing)
+
+        path = QPainterPath()
+        path.addRoundedRect(0, 0, self.width, self.height, radius, radius)
+        painter.setClipPath(path)
+        painter.drawPixmap(0, 0, scaled_pixmap)
+        painter.end()
+
+        return rounded_pixmap
+
+    @pyqtProperty(float)
+    def scale(self):
+        return self._scale
+
+    @scale.setter
+    def scale(self, value):
+        self._scale = value
+        self.setFixedSize(int(self.width * value), int(self.height * value))
+
+    def enterEvent(self, event):
+        """Animation d'entrée - zoom"""
+        self.scale_animation.setStartValue(1.0)
+        self.scale_animation.setEndValue(1.1)
+        self.scale_animation.start()
+
+        # Afficher info-bulle
+        self.setToolTip(f"{self.film.title}\n{self.film.genre} • {self.film.release_date.year}")
+
+        super().enterEvent(event)
+
+    def leaveEvent(self, event):
+        """Animation de sortie"""
+        self.scale_animation.setStartValue(1.1)
+        self.scale_animation.setEndValue(1.0)
+        self.scale_animation.start()
+
+        super().leaveEvent(event)
+
+    def mousePressEvent(self, event):
+        """Gère les clics"""
+        if event.button() == Qt.LeftButton:
+            self.clicked.emit(self.film)
+        super().mousePressEvent(event)
+
+class NetflixRow(QWidget):
+    """Une rangée Netflix horizontale avec titre et défilement"""
+
+    def __init__(self, title, films, on_film_click, parent=None):
+        super().__init__(parent)
+        self.films = films
+        self.on_film_click = on_film_click
+        self.setFixedHeight(320)
+
+        self.init_ui(title)
+
+    def init_ui(self, title):
+        layout = QVBoxLayout()
+        layout.setContentsMargins(40, 10, 40, 10)
+        layout.setSpacing(10)
+
+        # Titre de la rangée
+        title_label = QLabel(title)
+        title_label.setStyleSheet("""
+            QLabel {
+                color: #ffffff;
+                font-size: 18px;
+                font-weight: bold;
+                padding: 5px 0px;
+            }
+        """)
+        layout.addWidget(title_label)
+
+        # Zone de défilement horizontale
+        self.scroll_area = QScrollArea()
+        self.scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        self.scroll_area.setStyleSheet("""
+            QScrollArea {
+                background-color: transparent;
+                border: none;
+            }
+            QScrollBar:horizontal {
+                background-color: #2d2d2d;
+                height: 8px;
+                border-radius: 4px;
+            }
+            QScrollBar::handle:horizontal {
+                background-color: #555555;
+                border-radius: 4px;
+                min-width: 20px;
+            }
+            QScrollBar::handle:horizontal:hover {
+                background-color: #777777;
+            }
+        """)
+
+        # Conteneur pour les posters
+        self.posters_container = QWidget()
+        self.posters_layout = QHBoxLayout()
+        self.posters_layout.setSpacing(15)
+        self.posters_layout.setContentsMargins(10, 5, 10, 15)
+
+        self.create_posters()
+
+        self.posters_container.setLayout(self.posters_layout)
+        self.scroll_area.setWidget(self.posters_container)
+
+        layout.addWidget(self.scroll_area)
+        self.setLayout(layout)
+
+    def create_posters(self):
+        """Crée les posters pour cette rangée"""
+        for film in self.films[:20]:  # Limite à 20 films par rangée
+            poster = NetflixPosterCard(film, 160, 240)
+            poster.clicked.connect(self.on_film_click)
+            self.posters_layout.addWidget(poster)
+
+class NetflixSearchHeader(QWidget):
+    """Header style Netflix avec barre de recherche"""
+
+    search_requested = pyqtSignal(dict)  # Émet les critères de recherche
+
+    def __init__(self, film_controller, parent=None):
+        super().__init__(parent)
+        self.film_controller = film_controller
+        self.setFixedHeight(80)
+        self.setStyleSheet("""
+            NetflixSearchHeader {
+                background-color: rgba(20, 20, 20, 0.95);
+                border-bottom: 1px solid #2a2a2a;
+            }
+        """)
+
+        # Variables pour stocker les filtres actuels
+        self.current_genre = None
+        self.current_year = None
+
+        self.init_ui()
+        self.load_filter_data()
+
+    def init_ui(self):
+        layout = QHBoxLayout()
+        layout.setContentsMargins(20, 10, 20, 10)
+        layout.setSpacing(15)
+
+        # Logo
+        logo = QLabel("FILM FINDER")
+        logo.setStyleSheet("""
+            QLabel {
+                color: #e50914;
+                font-size: 24px;
+                font-weight: bold;
+                font-family: 'Arial Black';
+                padding: 5px 0px;
+            }
+        """)
+        layout.addWidget(logo)
+
+        # Barre de recherche avec recherche en temps réel
+        self.search_input = QLineEdit()
+        self.search_input.setPlaceholderText("Rechercher des films...")
+        self.search_input.setFixedWidth(300)
+        self.search_input.setStyleSheet("""
+            QLineEdit {
+                background-color: #2d2d2d;
+                border: 2px solid #424242;
+                border-radius: 20px;
+                padding: 8px 16px;
+                color: #ffffff;
+                font-size: 14px;
+            }
+            QLineEdit:focus {
+                border-color: #e50914;
+                background-color: #363636;
+            }
+            QLineEdit::placeholder {
+                color: #888888;
+            }
+        """)
+        self.search_input.textChanged.connect(self.on_text_changed)
+        self.search_input.returnPressed.connect(self.perform_search)
+        layout.addWidget(self.search_input)
+
+        # Timer pour la recherche en temps réel (évite les recherches trop fréquentes)
+        self.search_timer = QTimer()
+        self.search_timer.setSingleShot(True)
+        self.search_timer.timeout.connect(self.perform_search)
+
+        # Bouton recherche
+        search_btn = QPushButton("Rechercher")
+        search_btn.setFixedSize(100, 40)
+        search_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #e50914;
+                border: none;
+                border-radius: 20px;
+                color: white;
+                font-size: 14px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #f40612;
+            }
+        """)
+        search_btn.clicked.connect(self.perform_search)
+        layout.addWidget(search_btn)
+
+        layout.addStretch()
+
+        # Filtres avancés (bouton toggle)
+        self.filters_btn = QPushButton("Filtres")
+        self.filters_btn.setCheckable(True)
+        self.filters_btn.setStyleSheet("""
+            QPushButton {
+                background-color: transparent;
+                border: 1px solid #555555;
+                border-radius: 4px;
+                padding: 8px 16px;
+                color: #ffffff;
+            }
+            QPushButton:checked {
+                background-color: #e50914;
+                border-color: #e50914;
+            }
+            QPushButton:hover {
+                border-color: #e50914;
+            }
+        """)
+        self.filters_btn.toggled.connect(self.toggle_filters)
+        layout.addWidget(self.filters_btn)
+
+        self.setLayout(layout)
+
+    def on_text_changed(self, text):
+        """Déclenche la recherche après un délai"""
+        self.search_timer.stop()
+        if text.strip():  # Ne recherche que si du texte est saisi
+            self.search_timer.start(300)  # 300ms de délai
+
+    def load_filter_data(self):
+        """Charge les données pour les filtres"""
+        try:
+            films = self.film_controller.get_all_films()
+
+            # Genres uniques
+            self.genres = sorted(set(film.genre for film in films if hasattr(film, 'genre') and film.genre))
+
+            # Années uniques
+            self.years = sorted(set(film.release_date.year for film in films if hasattr(film, 'release_date')), reverse=True)
+
+        except Exception as e:
+            print(f"Erreur chargement données filtres: {e}")
+            self.genres = []
+            self.years = []
+
+    def toggle_filters(self, checked):
+        """Affiche/masque les filtres avancés"""
+        if checked:
+            self.show_advanced_filters()
+        else:
+            self.hide_advanced_filters()
+
+    def show_advanced_filters(self):
+        """Affiche le panneau de filtres avancés"""
+        # Supprimer l'ancien panneau s'il existe
+        if hasattr(self, 'filters_panel'):
+            self.filters_panel.deleteLater()
+
+        self.filters_panel = QFrame(self.parent())
+        self.filters_panel.setStyleSheet("""
+            QFrame {
+                background-color: #1a1a1a;
+                border: 1px solid #2d2d2d;
+                border-radius: 8px;
+                padding: 15px;
+            }
+        """)
+        self.filters_panel.setFixedWidth(300)
+
+        layout = QVBoxLayout()
+
+        # Titre
+        title = QLabel("Filtres avances")
+        title.setStyleSheet("color: #ffffff; font-size: 16px; font-weight: bold;")
+        layout.addWidget(title)
+
+        # Genre
+        layout.addWidget(QLabel("Genre:"))
+        self.genre_combo = QComboBox()
+        self.genre_combo.addItem("Tous les genres", "")
+        for genre in self.genres:
+            self.genre_combo.addItem(genre, genre)
+        # Restaurer la sélection précédente
+        if self.current_genre:
+            index = self.genre_combo.findData(self.current_genre)
+            if index >= 0:
+                self.genre_combo.setCurrentIndex(index)
+        self.genre_combo.setStyleSheet("""
+            QComboBox {
+                background-color: #2d2d2d;
+                border: 1px solid #424242;
+                border-radius: 4px;
+                padding: 6px;
+                color: #ffffff;
+            }
+        """)
+        layout.addWidget(self.genre_combo)
+
+        # Année
+        layout.addWidget(QLabel("Annee:"))
+        self.year_combo = QComboBox()
+        self.year_combo.addItem("Toutes les annees", "")
+        for year in self.years:
+            self.year_combo.addItem(str(year), year)
+        # Restaurer la sélection précédente
+        if self.current_year:
+            index = self.year_combo.findData(self.current_year)
+            if index >= 0:
+                self.year_combo.setCurrentIndex(index)
+        self.year_combo.setStyleSheet("""
+            QComboBox {
+                background-color: #2d2d2d;
+                border: 1px solid #424242;
+                border-radius: 4px;
+                padding: 6px;
+                color: #ffffff;
+            }
+        """)
+        layout.addWidget(self.year_combo)
+
+        # Boutons
+        btn_layout = QHBoxLayout()
+        apply_btn = QPushButton("Appliquer")
+        apply_btn.clicked.connect(self.apply_filters)
+        clear_btn = QPushButton("Effacer")
+        clear_btn.clicked.connect(self.clear_filters)
+
+        apply_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #e50914;
+                border: none;
+                border-radius: 4px;
+                padding: 6px 12px;
+                color: white;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #f40612;
+            }
+        """)
+
+        clear_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #555555;
+                border: none;
+                border-radius: 4px;
+                padding: 6px 12px;
+                color: white;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #666666;
+            }
+        """)
+
+        btn_layout.addWidget(apply_btn)
+        btn_layout.addWidget(clear_btn)
+        layout.addLayout(btn_layout)
+
+        self.filters_panel.setLayout(layout)
+
+        # Positionner sous le bouton filtres
+        pos = self.filters_btn.mapToGlobal(self.filters_btn.rect().bottomLeft())
+        parent_pos = self.parent().mapFromGlobal(pos)
+        self.filters_panel.move(parent_pos.x(), parent_pos.y() + 5)
+        self.filters_panel.show()
+
+    def hide_advanced_filters(self):
+        """Masque le panneau de filtres"""
+        if hasattr(self, 'filters_panel'):
+            self.filters_panel.hide()
+            self.filters_panel.deleteLater()
+            delattr(self, 'filters_panel')
+
+    def apply_filters(self):
+        """Applique les filtres et lance la recherche"""
+        # Sauvegarder les filtres actuels
+        self.current_genre = self.genre_combo.currentData()
+        self.current_year = self.year_combo.currentData()
+
+        criteria = {
+            'title': self.search_input.text().strip() or None,
+            'genre': self.current_genre,
+            'year': self.current_year
+        }
+
+        self.search_requested.emit(criteria)
+        self.hide_advanced_filters()
+        self.filters_btn.setChecked(False)
+
+    def clear_filters(self):
+        """Réinitialise tous les filtres"""
+        self.search_input.clear()
+        self.genre_combo.setCurrentIndex(0)
+        self.year_combo.setCurrentIndex(0)
+        self.current_genre = None
+        self.current_year = None
+
+        criteria = {'title': None, 'genre': None, 'year': None}
+        self.search_requested.emit(criteria)
+
+    def perform_search(self):
+        """Lance la recherche avec les critères actuels"""
+        try:
+            # Utiliser les filtres sauvegardés au lieu d'accéder directement aux combobox
+            criteria = {
+                'title': self.search_input.text().strip() or None,
+                'genre': self.current_genre,
+                'year': self.current_year
+            }
+            self.search_requested.emit(criteria)
+        except Exception as e:
+            print(f"Erreur lors de la recherche: {e}")
+
+class NetflixGridView(QWidget):
+    """Vue principale style Netflix avec plusieurs rangées"""
+
+    def __init__(self, film_controller, on_film_click, parent=None):
+        super().__init__(parent)
+        self.film_controller = film_controller
+        self.on_film_click = on_film_click
+
+        self.init_ui()
+        self.load_data()
+
+    def init_ui(self):
+        layout = QVBoxLayout()
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+
+        # Zone de défilement principale
+        self.main_scroll = QScrollArea()
+        self.main_scroll.setWidgetResizable(True)
+        self.main_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        self.main_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.main_scroll.setStyleSheet("""
+            QScrollArea {
+                background-color: #141414;
+                border: none;
+            }
+        """)
+
+        # Conteneur pour les rangées
+        self.rows_container = QWidget()
+        self.rows_layout = QVBoxLayout()
+        self.rows_layout.setSpacing(0)
+        self.rows_layout.setContentsMargins(0, 0, 0, 0)
+
+        self.rows_container.setLayout(self.rows_layout)
+        self.main_scroll.setWidget(self.rows_container)
+
+        layout.addWidget(self.main_scroll)
+        self.setLayout(layout)
+
+    def load_data(self):
+        """Charge les données et crée les rangées"""
+        # Nettoyer les anciennes rangées
+        for i in reversed(range(self.rows_layout.count())):
+            item = self.rows_layout.itemAt(i)
+            if item.widget():
+                item.widget().setParent(None)
+
+        try:
+            # Récupérer tous les films approuvés
+            all_films = self.film_controller.get_approved_films()
+
+            if not all_films:
+                # Aucun film trouvé
+                no_films_label = QLabel("Aucun film disponible\nCommencez par proposer des films !")
+                no_films_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+                no_films_label.setStyleSheet("""
+                    QLabel {
+                        color: #888888;
+                        font-size: 18px;
+                        padding: 50px;
+                        background-color: #1a1a1a;
+                        border-radius: 8px;
+                        margin: 20px;
+                    }
+                """)
+                self.rows_layout.addWidget(no_films_label)
+                return
+
+            # Créer différentes catégories (sans emojis)
+            categories = {
+                "Tendances actuelles": all_films[:10],
+                "Populaire sur Film Finder": all_films[5:15],
+                "Nouveaux films": sorted(all_films, key=lambda x: x.release_date, reverse=True)[:10],
+                "Recommandé pour vous": all_films[8:18],
+            }
+
+            # Ajouter des rangées par genre
+            genres = sorted(set(film.genre for film in all_films if hasattr(film, 'genre')))
+            for genre in genres[:4]:  # Maximum 4 genres
+                genre_films = [f for f in all_films if getattr(f, 'genre', '') == genre]
+                if genre_films:
+                    categories[f"{genre}"] = genre_films[:12]
+
+            # Créer les rangées
+            for title, films in categories.items():
+                if films:  # Ne créer que si il y a des films
+                    row = NetflixRow(title, films, self.on_film_click)
+                    self.rows_layout.addWidget(row)
+
+            self.rows_layout.addStretch()
+
+        except Exception as e:
+            error_label = QLabel(f"Erreur lors du chargement des films:\n{str(e)}")
+            error_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            error_label.setStyleSheet("""
+                QLabel {
+                    color: #ff6b6b;
+                    font-size: 14px;
+                    padding: 30px;
+                    background-color: #2d1a1a;
+                    border-radius: 8px;
+                    margin: 20px;
+                }
+            """)
+            self.rows_layout.addWidget(error_label)
 
 class FilmViewDialog(QDialog):
     """Read-only film viewer"""
@@ -62,7 +656,6 @@ class FilmViewDialog(QDialog):
 
         self.setLayout(layout)
 
-
 class FilmEditDialog(QDialog):
     """Dialog to propose a new film (or edit if needed)."""
 
@@ -82,7 +675,7 @@ class FilmEditDialog(QDialog):
 
         self.title_input = QLineEdit()
         self.genre_combo = QComboBox()
-        self.genre_combo.addItems(["Action", "Comédie", "Drame", "Science-Fiction", "Horreur", "Romance", "Thriller", "Animation", "Documentaire", "Aventure"])
+        self.genre_combo.addItems(["Action", "Comedie", "Drame", "Science-Fiction", "Horreur", "Romance", "Thriller", "Animation", "Documentaire", "Aventure"])
         self.date_input = QDateEdit()
         self.date_input.setCalendarPopup(True)
         self.date_input.setDate(QDate.currentDate())
@@ -139,8 +732,7 @@ class FilmEditDialog(QDialog):
         }
 
         if self.is_edit:
-            # For now editing requires admin rights; do not allow general edit
-            QMessageBox.information(self, 'Info', 'Modification via l\'interface admin')
+            QMessageBox.information(self, 'Info', 'Modification via l interface admin')
             self.reject()
             return
         else:
@@ -149,227 +741,260 @@ class FilmEditDialog(QDialog):
                 QMessageBox.information(self, 'Succès', 'Film proposé (en attente de validation)')
                 self.accept()
             else:
-                QMessageBox.critical(self, 'Erreur', 'Échec lors de la proposition du film')
-
+                QMessageBox.critical(self, 'Erreur', 'Echec lors de la proposition du film')
 
 class MainWindow(QMainWindow):
-    """Main window with user and admin features"""
+    """Main window with Netflix-like interface"""
+
+    logout_signal = pyqtSignal()
 
     def __init__(self, user):
         super().__init__()
         self.user = user
         self.film_controller = FilmController()
+
         self.setWindowTitle(f'Film Finder - {getattr(user, "username", "Invité")}')
-        self.setMinimumSize(900, 640)
+        self.setMinimumSize(1200, 800)
         self.init_ui()
 
     def init_ui(self):
         central = QWidget()
         self.setCentralWidget(central)
-        layout = QVBoxLayout()
+        self.main_layout = QVBoxLayout()
+        self.main_layout.setContentsMargins(0, 0, 0, 0)
+        self.main_layout.setSpacing(0)
 
-        self.tabs = QTabWidget()
-        layout.addWidget(self.tabs)
+        # Header Netflix avec recherche
+        self.header = NetflixSearchHeader(self.film_controller)
+        self.header.search_requested.connect(self.on_search_requested)
+        self.main_layout.addWidget(self.header)
 
-        self.create_search_tab()
-        self.create_my_films_tab()
-        if isinstance(self.user, Admin):
-            self.create_admin_tab()
+        # Vue principale Netflix
+        self.netflix_view = NetflixGridView(self.film_controller, self.on_film_clicked)
+        self.main_layout.addWidget(self.netflix_view)
 
-        central.setLayout(layout)
+        # Footer avec déconnexion
+        footer = QWidget()
+        footer.setFixedHeight(50)
+        footer.setStyleSheet("background-color: #141414; border-top: 1px solid #2a2a2a;")
+        footer_layout = QHBoxLayout()
+        footer_layout.setContentsMargins(20, 5, 20, 5)
 
-        # load style
+        user_info = QLabel(f'Connecté en tant que: {getattr(self.user, "username", "Invité")}')
+        user_info.setStyleSheet("color: #888888;")
+        footer_layout.addWidget(user_info)
+
+        footer_layout.addStretch()
+
+        logout_btn = QPushButton('Se deconnecter')
+        logout_btn.setStyleSheet("""
+            QPushButton {
+                background-color: transparent;
+                border: 1px solid #e50914;
+                border-radius: 4px;
+                padding: 6px 12px;
+                color: #e50914;
+            }
+            QPushButton:hover {
+                background-color: #e50914;
+                color: white;
+            }
+        """)
+        logout_btn.clicked.connect(self.on_logout_clicked)
+        footer_layout.addWidget(logout_btn)
+
+        footer.setLayout(footer_layout)
+        self.main_layout.addWidget(footer)
+
+        central.setLayout(self.main_layout)
+
+        # Charger le style
+        self.load_styles()
+
+    def load_styles(self):
+        """Charge le style QSS Netflix"""
         try:
-            qss = os.path.join(os.path.dirname(__file__), 'style.qss')
-            if os.path.exists(qss):
-                with open(qss, 'r', encoding='utf-8') as f:
+            qss_path = os.path.join(os.path.dirname(__file__), 'style.qss')
+            if os.path.exists(qss_path):
+                with open(qss_path, 'r', encoding='utf-8') as f:
                     self.setStyleSheet(f.read())
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"Erreur chargement style: {e}")
 
-    # --- Search tab ---
-    def create_search_tab(self):
-        tab = QWidget()
-        v = QVBoxLayout()
-        h = QHBoxLayout()
-        self.search_input = QLineEdit()
-        self.search_input.setPlaceholderText('Chercher par titre...')
-        btn = QPushButton('🔎 Rechercher')
-        btn.clicked.connect(self.search_films)
-        h.addWidget(self.search_input)
-        h.addWidget(btn)
-        v.addLayout(h)
+    def on_search_requested(self, criteria):
+        """Gère les requêtes de recherche"""
+        try:
+            # Adapter les critères pour FilmController
+            title = criteria.get('title')
+            genre = criteria.get('genre')
+            year = criteria.get('year')
 
-        self.results_list = QListWidget()
-        self.results_list.itemDoubleClicked.connect(self.open_film_from_item)
-        v.addWidget(self.results_list)
+            # Utiliser la méthode search_films existante
+            films = self.film_controller.search_films(
+                title=title,
+                genre=genre,
+                approved_only=True
+            )
 
-        tab.setLayout(v)
-        self.tabs.addTab(tab, '🔍 Recherche')
-        self.load_all_films()
+            # Filtrer par année si spécifiée
+            if year:
+                films = [f for f in films if hasattr(f, 'release_date') and f.release_date.year == year]
 
-    def load_all_films(self):
-        self.results_list.clear()
-        for f in self.film_controller.get_approved_films():
-            item = QListWidgetItem(f'{f.id} - {f.title} ({f.release_date.year})')
-            item.setData(Qt.UserRole, f)
-            self.results_list.addItem(item)
+            # Afficher les résultats
+            self.show_search_results(films, criteria)
 
-    def search_films(self):
-        q = self.search_input.text().strip()
-        self.results_list.clear()
-        for f in self.film_controller.search_films(title=q, approved_only=True):
-            item = QListWidgetItem(f'{f.id} - {f.title} ({f.release_date.year})')
-            item.setData(Qt.UserRole, f)
-            self.results_list.addItem(item)
+        except Exception as e:
+            print(f"Erreur recherche: {e}")
+            self.show_error_message(f"Erreur lors de la recherche: {e}")
 
-    def open_film_from_item(self, item: QListWidgetItem):
-        film = item.data(Qt.UserRole)
+    def show_error_message(self, message):
+        """Affiche un message d'erreur stylisé"""
+        error_msg = QMessageBox(self)
+        error_msg.setWindowTitle("Erreur")
+        error_msg.setText(message)
+        error_msg.setStyleSheet("""
+            QMessageBox {
+                background-color: #141414;
+                color: #ffffff;
+            }
+            QMessageBox QLabel {
+                color: #ffffff;
+                background-color: #141414;
+            }
+            QMessageBox QPushButton {
+                background-color: #e50914;
+                color: white;
+                border: none;
+                padding: 8px 16px;
+                border-radius: 4px;
+                min-width: 80px;
+            }
+            QMessageBox QPushButton:hover {
+                background-color: #f40612;
+            }
+        """)
+        error_msg.exec_()
+
+    def show_search_results(self, films, criteria):
+        """Affiche les résultats de recherche"""
+        # Cache la vue Netflix normale
+        self.netflix_view.hide()
+
+        # Supprimer l'ancienne vue de résultats si elle existe
+        if hasattr(self, 'search_results_view'):
+            self.search_results_view.hide()
+            self.main_layout.removeWidget(self.search_results_view)
+            self.search_results_view.deleteLater()
+
+        # Crée une nouvelle vue de résultats
+        self.search_results_view = QWidget()
+        search_results_layout = QVBoxLayout()
+        search_results_layout.setContentsMargins(0, 0, 0, 0)
+        search_results_layout.setSpacing(0)
+        self.search_results_view.setLayout(search_results_layout)
+
+        # Titre des résultats
+        results_title = QLabel(f"Resultats de recherche ({len(films)} films trouves)")
+        results_title.setStyleSheet("""
+            QLabel {
+                color: #ffffff;
+                font-size: 24px;
+                font-weight: bold;
+                padding: 20px;
+                background-color: #1a1a1a;
+            }
+        """)
+        search_results_layout.addWidget(results_title)
+
+        # Bouton retour
+        back_btn = QPushButton("Retour a l'accueil")
+        back_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #e50914;
+                border: none;
+                border-radius: 4px;
+                padding: 8px 16px;
+                color: white;
+                font-weight: bold;
+                margin: 0px 20px 20px 20px;
+            }
+            QPushButton:hover {
+                background-color: #f40612;
+            }
+        """)
+        back_btn.clicked.connect(self.show_main_view)
+        search_results_layout.addWidget(back_btn)
+
+        # Grille de résultats
+        if films:
+            results_container = QWidget()
+            results_layout = QVBoxLayout()
+            results_container.setLayout(results_layout)
+
+            results_grid = QWidget()
+            grid_layout = QGridLayout()
+            grid_layout.setSpacing(20)
+            grid_layout.setContentsMargins(20, 20, 20, 20)
+            results_grid.setLayout(grid_layout)
+
+            thumb_w = 180
+            thumb_h = 270
+            cols = 6
+            row = 0
+            col = 0
+
+            for film in films:
+                poster = NetflixPosterCard(film, thumb_w, thumb_h)
+                poster.clicked.connect(self.on_film_clicked)
+                grid_layout.addWidget(poster, row, col)
+
+                col += 1
+                if col >= cols:
+                    col = 0
+                    row += 1
+
+            scroll_area = QScrollArea()
+            scroll_area.setWidgetResizable(True)
+            scroll_area.setWidget(results_grid)
+            results_layout.addWidget(scroll_area)
+
+            search_results_layout.addWidget(results_container)
+        else:
+            no_results = QLabel("Aucun film ne correspond a votre recherche")
+            no_results.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            no_results.setStyleSheet("""
+                QLabel {
+                    color: #888888;
+                    font-size: 18px;
+                    padding: 50px;
+                }
+            """)
+            search_results_layout.addWidget(no_results)
+
+        # Ajouter la vue de résultats au layout principal
+        self.main_layout.insertWidget(1, self.search_results_view)
+        self.search_results_view.show()
+
+    def show_main_view(self):
+        """Retourne à la vue principale"""
+        if hasattr(self, 'search_results_view'):
+            self.search_results_view.hide()
+            self.main_layout.removeWidget(self.search_results_view)
+            self.search_results_view.deleteLater()
+            delattr(self, 'search_results_view')
+        self.netflix_view.show()
+
+    def on_film_clicked(self, film):
+        """Gère le clic sur un film"""
         FilmViewDialog(film, parent=self).exec()
 
-    # --- My films tab ---
-    def create_my_films_tab(self):
-        tab = QWidget()
-        v = QVBoxLayout()
-
-        h = QHBoxLayout()
-        propose_btn = QPushButton('➕ Proposer un film')
-        propose_btn.clicked.connect(self.propose_film)
-        refresh_btn = QPushButton('🔄 Rafraîchir')
-        refresh_btn.clicked.connect(self.refresh_my_films)
-        h.addWidget(propose_btn)
-        h.addWidget(refresh_btn)
-        h.addStretch()
-        v.addLayout(h)
-
-        self.my_list = QListWidget()
-        v.addWidget(self.my_list)
-
-        btns = QHBoxLayout()
-        view = QPushButton('🔍 Voir')
-        withdraw = QPushButton('↩️ Retirer')
-        view.clicked.connect(self.my_view)
-        withdraw.clicked.connect(self.my_withdraw)
-        btns.addWidget(view)
-        btns.addWidget(withdraw)
-        btns.addStretch()
-        v.addLayout(btns)
-
-        tab.setLayout(v)
-        self.tabs.addTab(tab, '📝 Mes films')
-        self.refresh_my_films()
-
-    def refresh_my_films(self):
-        self.my_list.clear()
-        for f in self.film_controller.get_films_by_user(self.user.id):
-            status = '✅' if f.approved else '⏳'
-            item = QListWidgetItem(f'{f.id} - {f.title} {status}')
-            item.setData(Qt.UserRole, f)
-            self.my_list.addItem(item)
-
-    def propose_film(self):
-        dlg = FilmEditDialog(self.film_controller, self.user, parent=self)
-        if dlg.exec() == QDialog.Accepted:
-            self.refresh_my_films()
-            self.load_all_films()
-
-    def _selected_from_list(self, list_widget: QListWidget):
-        items = list_widget.selectedItems()
-        if not items:
-            QMessageBox.information(self, 'Info', 'Veuillez sélectionner un film')
-            return None
-        return items[0].data(Qt.UserRole)
-
-    def my_view(self):
-        f = self._selected_from_list(self.my_list)
-        if f:
-            FilmViewDialog(f, parent=self).exec()
-
-    def my_withdraw(self):
-        f = self._selected_from_list(self.my_list)
-        if not f:
-            return
-        if f.approved:
-            QMessageBox.information(self, 'Info', 'Impossible de retirer un film déjà approuvé')
-            return
-        confirm = QMessageBox.question(self, 'Confirmer', f"Retirer la proposition '{f.title}' ?")
-        if confirm != QMessageBox.StandardButton.Yes and confirm != QMessageBox.StandardButton.Ok:
-            return
-        ok = self.film_controller.withdraw_film(f.id, self.user)
-        if ok:
-            QMessageBox.information(self, 'Succès', 'Proposition retirée')
-            self.refresh_my_films()
-
-    # --- Admin tab ---
-    def create_admin_tab(self):
-        tab = QWidget()
-        v = QVBoxLayout()
-        h = QHBoxLayout()
-        refresh = QPushButton('🔄 Rafraîchir')
-        refresh.clicked.connect(self.refresh_admin_tab)
-        h.addWidget(QLabel('Films en attente:'))
-        h.addStretch()
-        h.addWidget(refresh)
-        v.addLayout(h)
-
-        self.pending_list = QListWidget()
-        v.addWidget(self.pending_list)
-
-        btns = QHBoxLayout()
-        view = QPushButton('🔍 Voir')
-        approve = QPushButton('✅ Valider')
-        delete = QPushButton('🗑️ Supprimer')
-        view.clicked.connect(self.admin_view)
-        approve.clicked.connect(self.admin_approve)
-        delete.clicked.connect(self.admin_delete)
-        btns.addWidget(view)
-        btns.addWidget(approve)
-        btns.addWidget(delete)
-        btns.addStretch()
-        v.addLayout(btns)
-
-        tab.setLayout(v)
-        self.tabs.addTab(tab, '⚙️ Administration')
-        self.refresh_admin_tab()
-
-    def refresh_admin_tab(self):
-        self.pending_list.clear()
-        for f in self.film_controller.get_pending_films():
-            item = QListWidgetItem(f'{f.id} - {f.title} ({f.release_date.year})')
-            item.setData(Qt.UserRole, f)
-            self.pending_list.addItem(item)
-
-    def _selected_pending(self):
-        items = self.pending_list.selectedItems()
-        if not items:
-            QMessageBox.information(self, 'Info', 'Veuillez sélectionner un film')
-            return None
-        return items[0].data(Qt.UserRole)
-
-    def admin_view(self):
-        f = self._selected_pending()
-        if f:
-            FilmViewDialog(f, parent=self).exec()
-
-    def admin_approve(self):
-        f = self._selected_pending()
-        if not f:
-            return
-        ok = self.film_controller.validate_film(f.id, self.user)
-        if ok:
-            QMessageBox.information(self, 'Succès', 'Film validé')
-            self.refresh_admin_tab()
-            self.load_all_films()
-
-    def admin_delete(self):
-        f = self._selected_pending()
-        if not f:
-            return
-        ok = self.film_controller.delete_film(f.id, self.user)
-        if ok:
-            QMessageBox.information(self, 'Succès', 'Film supprimé')
-            self.refresh_admin_tab()
-
+    def on_logout_clicked(self):
+        """Gère la déconnexion"""
+        try:
+            self.logout_signal.emit()
+        except Exception:
+            pass
+        self.close()
 
 def main():
     app = QApplication(sys.argv)
@@ -391,818 +1016,6 @@ def main():
         window = MainWindow(user)
         window.show()
 
-    sys.exit(app.exec())
-
-
-if __name__ == '__main__':
-    main()
-import sys
-import os
-from PyQt5.QtWidgets import (
-    QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
-    QLabel, QLineEdit, QPushButton, QListWidget, QListWidgetItem,
-    QMessageBox, QTabWidget, QTextEdit, QDialog, QDialogButtonBox,
-    QSizePolicy, QScrollArea
-)
-from PyQt5.QtCore import Qt, QDate, QUrl
-from PyQt5.QtGui import QFont, QPixmap
-
-sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
-
-from core.filmcontroller import FilmController
-from core.admins import Admin
-
-
-class FilmDialog(QDialog):
-    """Simple dialog to view a film's details (read-only) and optionally play trailer."""
-
-    def __init__(self, film, parent=None):
-        super().__init__(parent)
-        self.film = film
-        self.setWindowTitle(film.title)
-        self.setMinimumSize(480, 360)
-        self.init_ui()
-
-    def init_ui(self):
-        layout = QVBoxLayout()
-
-        title = QLabel(self.film.title)
-        title.setFont(QFont('Arial', 16, QFont.Weight.Bold))
-        layout.addWidget(title)
-
-        # Horizontal area: poster + description
-        hl = QHBoxLayout()
-
-        poster = QLabel()
-        poster.setFixedSize(160, 240)
-        poster.setScaledContents(True)
-        try:
-            if self.film.poster_path and os.path.exists(self.film.poster_path):
-                pix = QPixmap(self.film.poster_path)
-                poster.setPixmap(pix)
-        except Exception:
-            pass
-        hl.addWidget(poster)
-
-        desc = QTextEdit()
-        desc.setReadOnly(True)
-        desc.setText(self.film.description or "(Pas de description)")
-        desc.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
-        hl.addWidget(desc)
-
-        layout.addLayout(hl)
-
-        # Buttons
-        btns = QHBoxLayout()
-        btns.addStretch()
-        close = QPushButton("Fermer")
-        close.clicked.connect(self.accept)
-        btns.addWidget(close)
-        layout.addLayout(btns)
-
-        self.setLayout(layout)
-
-
-class MainWindow(QMainWindow):
-    """Main application window with simple search and admin tabs."""
-
-    def __init__(self, user):
-        super().__init__()
-        self.user = user
-        self.film_controller = FilmController()
-        self.setWindowTitle(f"Film Finder - {getattr(user, 'username', 'Invité')}")
-        self.setMinimumSize(800, 600)
-        self.init_ui()
-
-    def init_ui(self):
-        central = QWidget()
-        self.setCentralWidget(central)
-        main_layout = QVBoxLayout()
-
-        # Tabs
-        self.tabs = QTabWidget()
-        self.tabs.setTabsClosable(False)
-        main_layout.addWidget(self.tabs)
-
-        self.create_search_tab()
-        # Only add admin tab for Admins
-        if isinstance(self.user, Admin):
-            self.create_admin_tab()
-
-        central.setLayout(main_layout)
-
-        # Load QSS if available for nicer colors
-        try:
-            qss_path = os.path.join(os.path.dirname(__file__), 'style.qss')
-            if os.path.exists(qss_path):
-                with open(qss_path, 'r', encoding='utf-8') as f:
-                    self.setStyleSheet(f.read())
-        except Exception:
-            pass
-
-    def create_search_tab(self):
-        tab = QWidget()
-        layout = QVBoxLayout()
-
-        # Search bar
-        hl = QHBoxLayout()
-        self.search_input = QLineEdit()
-        self.search_input.setPlaceholderText('Chercher un film par titre...')
-        search_btn = QPushButton('🔎 Rechercher')
-        search_btn.clicked.connect(self.search_films)
-        hl.addWidget(self.search_input)
-        hl.addWidget(search_btn)
-        layout.addLayout(hl)
-
-        # Results
-        self.results_list = QListWidget()
-        self.results_list.itemDoubleClicked.connect(self.open_selected_film)
-        layout.addWidget(self.results_list)
-
-        tab.setLayout(layout)
-        self.tabs.addTab(tab, '🔍 Recherche')
-
-        # initial load
-        self.load_all_films()
-
-    def load_all_films(self):
-        try:
-            films = self.film_controller.get_all_films()
-            self.results_list.clear()
-            for f in films:
-                item = QListWidgetItem(f"{f.id} - {f.title} ({f.release_date.year})")
-                item.setData(Qt.UserRole, f)
-                self.results_list.addItem(item)
-        except Exception as e:
-            QMessageBox.critical(self, 'Erreur', f"Impossible de charger les films: {e}")
-
-    def search_films(self):
-        q = self.search_input.text().strip()
-        try:
-            results = self.film_controller.search_films({'title': q}) if q else self.film_controller.get_all_films()
-            self.results_list.clear()
-            for f in results:
-                item = QListWidgetItem(f"{f.id} - {f.title} ({f.release_date.year})")
-                item.setData(Qt.UserRole, f)
-                self.results_list.addItem(item)
-        except Exception as e:
-            QMessageBox.critical(self, 'Erreur', f"Recherche échouée: {e}")
-
-    def open_selected_film(self, item: QListWidgetItem):
-        film = item.data(Qt.UserRole)
-        dlg = FilmDialog(film, parent=self)
-        dlg.exec()
-
-    def create_admin_tab(self):
-        tab = QWidget()
-        layout = QVBoxLayout()
-
-        hl = QHBoxLayout()
-        refresh = QPushButton('🔄 Rafraîchir')
-        refresh.clicked.connect(self.refresh_admin_tab)
-        hl.addWidget(QLabel('Films en attente:'))
-        hl.addStretch()
-        hl.addWidget(refresh)
-        layout.addLayout(hl)
-
-        self.pending_list = QListWidget()
-        layout.addWidget(self.pending_list)
-
-        btns = QHBoxLayout()
-        view = QPushButton('🔍 Voir')
-        approve = QPushButton('✅ Valider')
-        delete = QPushButton('🗑️ Supprimer')
-        view.clicked.connect(self.admin_view)
-        approve.clicked.connect(self.admin_approve)
-        delete.clicked.connect(self.admin_delete)
-        btns.addWidget(view)
-        btns.addWidget(approve)
-        btns.addWidget(delete)
-        btns.addStretch()
-        layout.addLayout(btns)
-
-        tab.setLayout(layout)
-        self.tabs.addTab(tab, '⚙️ Administration')
-        self.refresh_admin_tab()
-
-    def refresh_admin_tab(self):
-        try:
-            pending = self.film_controller.get_pending_films()
-            self.pending_list.clear()
-            for f in pending:
-                item = QListWidgetItem(f"{f.id} - {f.title} ({f.release_date.year})")
-                item.setData(Qt.UserRole, f)
-                self.pending_list.addItem(item)
-        except Exception as e:
-            QMessageBox.critical(self, 'Erreur', f"Impossible de charger en attente: {e}")
-
-    def _selected_pending(self):
-        items = self.pending_list.selectedItems()
-        if not items:
-            QMessageBox.information(self, 'Info', 'Sélectionnez un film')
-            return None
-        return items[0].data(Qt.UserRole)
-
-    def admin_view(self):
-        f = self._selected_pending()
-        if f:
-            FilmDialog(f, parent=self).exec()
-
-    def admin_approve(self):
-        f = self._selected_pending()
-        if not f:
-            return
-        try:
-            ok = self.film_controller.validate_film(f.id, self.user)
-            if ok:
-                QMessageBox.information(self, 'Succès', 'Film validé')
-                self.refresh_admin_tab()
-        except Exception as e:
-            QMessageBox.critical(self, 'Erreur', f"Échec validation: {e}")
-
-    def admin_delete(self):
-        f = self._selected_pending()
-        if not f:
-            return
-        try:
-            ok = self.film_controller.delete_film(f.id, self.user)
-            if ok:
-                QMessageBox.information(self, 'Succès', 'Film supprimé')
-                self.refresh_admin_tab()
-        except Exception as e:
-            QMessageBox.critical(self, 'Erreur', f"Échec suppression: {e}")
-
-
-def main():
-    app = QApplication(sys.argv)
-    # Prefer opening the login window so we don't auto-create data on import
-    try:
-        from ui.login_window import LoginWindow
-
-        login = LoginWindow()
-
-        def _on_login(user):
-            mw = MainWindow(user)
-            mw.show()
-            # hide login window to avoid confusion
-            login.hide()
-
-        login.login_success.connect(_on_login)
-        login.show()
-    except Exception:
-        # If something fails, open a simple main window for development
-        from core.users import User
-        user = User.create_user(0, 'Dev', 'User', 'dev@local', 'dev', 'DevPass1!')
-        window = MainWindow(user)
-        window.show()
-
-    sys.exit(app.exec())
-
-
-if __name__ == '__main__':
-    main()
-import sys
-import os
-from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
-                             QHBoxLayout, QLabel, QLineEdit, QPushButton,
-                             QListWidget, QListWidgetItem, QMessageBox,
-                             QTabWidget, QFrame, QComboBox, QDateEdit,
-                             QTextEdit, QDialog, QDialogButtonBox, QSizePolicy, QScrollArea)
-from PyQt5.QtCore import Qt, QDate, pyqtSignal, QUrl
-from PyQt5.QtGui import QFont, QPixmap, QIcon
-try:
-    # Modules multimedia optionnels — peuvent ne pas être disponibles sur toutes les plateformes
-    from PyQt5.QtMultimedia import QMediaPlayer, QMediaContent
-    from PyQt5.QtMultimediaWidgets import QVideoWidget
-    MULTIMEDIA_AVAILABLE = True
-except Exception:
-    MULTIMEDIA_AVAILABLE = False
-
-sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
-
-from core.filmcontroller import FilmController
-from core.films import Film
-from core.admins import Admin
-from datetime import date
-
-class FilmDialog(QDialog):
-    """Dialogue pour ajouter/modifier un film"""
-    def __init__(self, film_controller, user, film=None, parent=None):
-        super().__init__(parent)
-        self.film_controller = film_controller
-        self.user = user
-        self.film = film
-        self.is_edit = film is not None
-
-        self.init_ui()
-
-    def init_ui(self):
-        """Initialise l'interface du dialogue"""
-        self.setWindowTitle("Modifier le film" if self.is_edit else "Proposer un film")
-        # Dialog resizable for responsiveness
-        self.setMinimumSize(480, 520)
-        self.resize(520, 640)
-
-        # Layout principal du dialogue
-        layout = QVBoxLayout()
-
-        # Titre
-        title_label = QLabel("Modifier le film" if self.is_edit else "Nouveau film")
-        title_label.setFont(QFont("Arial", 16, QFont.Weight.Bold))
-
-        # Formulaire
-        form_layout = QVBoxLayout()
-
-        # Titre du film
-        form_layout.addWidget(QLabel("Titre*:"))
-        self.title_input = QLineEdit()
-        if self.is_edit:
-            self.title_input.setText(self.film.title)
-        form_layout.addWidget(self.title_input)
-
-        # Genre
-        form_layout.addWidget(QLabel("Genre*:"))
-        self.genre_combo = QComboBox()
-        genres = ["Action", "Comédie", "Drame", "Science-Fiction", "Horreur",
-                 "Romance", "Thriller", "Animation", "Documentaire", "Aventure"]
-        self.genre_combo.addItems(genres)
-        if self.is_edit:
-            index = self.genre_combo.findText(self.film.genre)
-            if index >= 0:
-                self.genre_combo.setCurrentIndex(index)
-        form_layout.addWidget(self.genre_combo)
-
-        # Date de sortie
-        form_layout.addWidget(QLabel("Date de sortie*:"))
-        self.date_input = QDateEdit()
-        self.date_input.setCalendarPopup(True)
-        self.date_input.setDate(QDate.currentDate())
-        if self.is_edit:
-            qdate = QDate(self.film.release_date.year,
-                         self.film.release_date.month,
-                         self.film.release_date.day)
-            self.date_input.setDate(qdate)
-        form_layout.addWidget(self.date_input)
-
-        # Description
-        form_layout.addWidget(QLabel("Description:"))
-        self.description_input = QTextEdit()
-        # Let description expand vertically when dialog resized
-        self.description_input.setMinimumHeight(80)
-        self.description_input.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
-        if self.is_edit:
-            self.description_input.setText(self.film.description)
-        form_layout.addWidget(self.description_input)
-
-        # Poster URL
-        form_layout.addWidget(QLabel("URL du poster:"))
-        self.poster_input = QLineEdit()
-        if self.is_edit:
-            self.poster_input.setText(self.film.poster_path)
-        self.poster_input.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
-        form_layout.addWidget(self.poster_input)
-
-        # Trailer URL
-        form_layout.addWidget(QLabel("URL de la bande-annonce:"))
-        self.trailer_input = QLineEdit()
-        if self.is_edit:
-            self.trailer_input.setText(self.film.trailer_url)
-        self.trailer_input.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
-        form_layout.addWidget(self.trailer_input)
-
-        # Boutons
-        button_box = QDialogButtonBox(
-            QDialogButtonBox.StandardButton.Ok |
-            QDialogButtonBox.StandardButton.Cancel
-        )
-        button_box.accepted.connect(self.accept)
-        button_box.rejected.connect(self.reject)
-
-        # Assemblage
-        layout.addWidget(title_label)
-        layout.addLayout(form_layout)
-        layout.addWidget(button_box)
-
-        # Wrap content in a scroll area for small screens
-        container = QWidget()
-        container.setLayout(layout)
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setWidget(container)
-        outer = QVBoxLayout()
-        outer.addWidget(scroll)
-        self.setLayout(outer)
-        container = QWidget()
-        container.setLayout(layout)
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setWidget(container)
-        outer = QVBoxLayout()
-        outer.addWidget(scroll)
-        self.setLayout(outer)
-
-    def accept(self):
-        """Valide et sauvegarde le film"""
-        title = self.title_input.text().strip()
-        genre = self.genre_combo.currentText()
-        release_date = self.date_input.date().toPyDate()
-        description = self.description_input.toPlainText().strip()
-        poster_path = self.poster_input.text().strip()
-        trailer_url = self.trailer_input.text().strip()
-
-        if not title or not genre:
-            QMessageBox.warning(self, "Erreur", "Les champs titre et genre sont obligatoires")
-            return
-
-        film_data = {
-            'title': title,
-            'genre': genre,
-            'release_date': release_date,
-            'description': description,
-            'poster_path': poster_path,
-            'trailer_url': trailer_url
-        }
-
-        if self.is_edit:
-            # Modification
-            success = self.film_controller.update_film(
-                self.film.id, film_data, self.user
-            )
-            if success:
-                QMessageBox.information(self, "Succès", "Film modifié avec succès!")
-                super().accept()
-            else:
-                QMessageBox.critical(self, "Erreur", "Erreur lors de la modification du film")
-        else:
-            # Nouveau film
-            class FilmDialog(QDialog):
-                """Dialogue pour ajouter/modifier un film"""
-
-                def __init__(self, film_controller, user, film=None, parent=None):
-                    super().__init__(parent)
-                    self.film_controller = film_controller
-                    self.user = user
-                    self.film = film
-                    self.is_edit = film is not None
-
-                    self.init_ui()
-
-                def init_ui(self):
-                    """Initialise l'interface du dialogue"""
-                    self.setWindowTitle("Modifier le film" if self.is_edit else "Proposer un film")
-                    # Dialog resizable for responsiveness
-                    self.setMinimumSize(480, 520)
-                    self.resize(520, 640)
-
-                    # Layout principal du dialogue
-                    layout = QVBoxLayout()
-
-                    # Titre
-                    title_label = QLabel("Modifier le film" if self.is_edit else "Nouveau film")
-                    title_label.setFont(QFont("Arial", 16, QFont.Weight.Bold))
-
-                    # Formulaire
-                    form_layout = QVBoxLayout()
-
-                    # Titre du film
-                    form_layout.addWidget(QLabel("Titre*:"))
-                    self.title_input = QLineEdit()
-                    if self.is_edit:
-                        self.title_input.setText(self.film.title)
-                    form_layout.addWidget(self.title_input)
-
-                    # Genre
-                    form_layout.addWidget(QLabel("Genre*:"))
-                    self.genre_combo = QComboBox()
-                    genres = ["Action", "Comédie", "Drame", "Science-Fiction", "Horreur",
-                             "Romance", "Thriller", "Animation", "Documentaire", "Aventure"]
-                    self.genre_combo.addItems(genres)
-                    if self.is_edit:
-                        index = self.genre_combo.findText(self.film.genre)
-                        if index >= 0:
-                            self.genre_combo.setCurrentIndex(index)
-                    form_layout.addWidget(self.genre_combo)
-
-                    # Date de sortie
-                    form_layout.addWidget(QLabel("Date de sortie*:"))
-                    self.date_input = QDateEdit()
-                    self.date_input.setCalendarPopup(True)
-                    self.date_input.setDate(QDate.currentDate())
-                    if self.is_edit:
-                        qdate = QDate(self.film.release_date.year,
-                                     self.film.release_date.month,
-                                     self.film.release_date.day)
-                        self.date_input.setDate(qdate)
-                    form_layout.addWidget(self.date_input)
-
-                    # Description
-                    form_layout.addWidget(QLabel("Description:"))
-                    self.description_input = QTextEdit()
-                    # Let description expand vertically when dialog resized
-                    self.description_input.setMinimumHeight(80)
-                    self.description_input.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
-                    if self.is_edit:
-                        self.description_input.setText(self.film.description)
-                    form_layout.addWidget(self.description_input)
-
-                    # Poster URL
-                    form_layout.addWidget(QLabel("URL du poster:"))
-                    self.poster_input = QLineEdit()
-                    if self.is_edit:
-                        self.poster_input.setText(self.film.poster_path)
-                    self.poster_input.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
-                    form_layout.addWidget(self.poster_input)
-
-                    # Trailer URL
-                    form_layout.addWidget(QLabel("URL de la bande-annonce:"))
-                    self.trailer_input = QLineEdit()
-                    if self.is_edit:
-                        self.trailer_input.setText(self.film.trailer_url)
-                    self.trailer_input.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
-                    form_layout.addWidget(self.trailer_input)
-
-                    # Boutons
-                    button_box = QDialogButtonBox(
-                        QDialogButtonBox.StandardButton.Ok |
-                        QDialogButtonBox.StandardButton.Cancel
-                    )
-                    button_box.accepted.connect(self.accept)
-                    button_box.rejected.connect(self.reject)
-
-                    # Assemblage
-                    layout.addWidget(title_label)
-                    layout.addLayout(form_layout)
-                    layout.addWidget(button_box)
-
-                    # Wrap content in a scroll area for small screens
-                    container = QWidget()
-                    container.setLayout(layout)
-                    scroll = QScrollArea()
-                    scroll.setWidgetResizable(True)
-                    scroll.setWidget(container)
-                    outer = QVBoxLayout()
-                    outer.addWidget(scroll)
-                    self.setLayout(outer)
-
-                def accept(self):
-                    """Valide et sauvegarde le film"""
-                    title = self.title_input.text().strip()
-                    genre = self.genre_combo.currentText()
-                    release_date = self.date_input.date().toPyDate()
-                    description = self.description_input.toPlainText().strip()
-                    poster_path = self.poster_input.text().strip()
-                    trailer_url = self.trailer_input.text().strip()
-
-                    if not title or not genre:
-                        QMessageBox.warning(self, "Erreur", "Les champs titre et genre sont obligatoires")
-                        return
-
-                    film_data = {
-                        'title': title,
-                        'genre': genre,
-                        'release_date': release_date,
-                        'description': description,
-                        'poster_path': poster_path,
-                        'trailer_url': trailer_url
-                    }
-
-                    if self.is_edit:
-                        # Modification
-                        success = self.film_controller.update_film(
-                            self.film.id, film_data, self.user
-                        )
-                        if success:
-                            QMessageBox.information(self, "Succès", "Film modifié avec succès!")
-                            super().accept()
-                        else:
-                            QMessageBox.critical(self, "Erreur", "Erreur lors de la modification du film")
-                    else:
-                        # Nouveau film
-                        success = self.film_controller.add_film(film_data, self.user)
-                        if success:
-                            QMessageBox.information(self, "Succès", "Film proposé avec succès! En attente de validation.")
-                            super().accept()
-                        else:
-                            QMessageBox.critical(self, "Erreur", "Erreur lors de l'ajout du film")
-
-        # Boutons action: jouer bande-annonce si dispo
-        hl = QHBoxLayout()
-        hl.addStretch()
-        if film.trailer_url:
-            play_btn = QPushButton("▶️ Lire la bande-annonce")
-            def _play_trailer():
-                # Si les modules multimedia sont disponibles, ouvrir un lecteur simple
-                if MULTIMEDIA_AVAILABLE:
-                    trailer_dialog = QDialog(self)
-                    trailer_dialog.setWindowTitle(f"Bande-annonce - {film.title}")
-                    trailer_dialog.setMinimumSize(640, 480)
-
-                    v = QVBoxLayout()
-                    video_widget = QVideoWidget()
-                    v.addWidget(video_widget)
-
-                    player = QMediaPlayer()
-                    player.setVideoOutput(video_widget)
-                    try:
-                        url = QUrl.fromUserInput(film.trailer_url)
-                        player.setMedia(QMediaContent(url))
-                    except Exception as e:
-                        QMessageBox.critical(self, "Erreur", f"Impossible de charger la bande-annonce: {e}")
-                        return
-
-                    # Contrôles simples
-                    ctrl_layout = QHBoxLayout()
-                    pause_btn = QPushButton("Pause")
-                    stop_btn = QPushButton("Stop")
-                    ctrl_layout.addWidget(pause_btn)
-                    ctrl_layout.addWidget(stop_btn)
-                    v.addLayout(ctrl_layout)
-
-                    pause_btn.clicked.connect(lambda: player.pause())
-                    stop_btn.clicked.connect(lambda: player.stop())
-
-                    trailer_dialog.setLayout(v)
-                    player.play()
-                    trailer_dialog.exec()
-                else:
-                    # Ouvrir avec le navigateur/lecteur externe si multimedia indisponible
-                    try:
-                        from PyQt5.QtGui import QDesktopServices
-                        QDesktopServices.openUrl(QUrl(film.trailer_url))
-                    except Exception:
-                        QMessageBox.information(self, "Info", "Impossible de lancer la bande-annonce depuis l'application."
-                                                    " Ouvrez le lien manuellement.")
-
-            play_btn.clicked.connect(_play_trailer)
-            hl.addWidget(play_btn)
-
-        close_btn = QPushButton("Fermer")
-        close_btn.clicked.connect(dialog.accept)
-        hl.addWidget(close_btn)
-        hl.addStretch()
-
-        vlayout.addLayout(hl)
-
-        dialog.setLayout(vlayout)
-        dialog.exec()
-
-    def create_my_films_tab(self):
-        """Crée l'onglet 'Mes films'"""
-        tab = QWidget()
-        layout = QVBoxLayout()
-
-        # À implémenter
-        layout.addWidget(QLabel("Mes films proposés (à implémenter)"))
-
-        tab.setLayout(layout)
-        self.tabs.addTab(tab, "📝 Mes films")
-
-    def create_admin_tab(self):
-        """Crée l'onglet administrateur"""
-        tab = QWidget()
-        layout = QVBoxLayout()
-
-        # Liste des films en attente
-        hl_top = QHBoxLayout()
-        hl_top.addWidget(QLabel("Films en attente:"))
-        refresh_btn = QPushButton("🔄 Rafraîchir")
-        refresh_btn.clicked.connect(self.refresh_admin_tab)
-        hl_top.addWidget(refresh_btn)
-        hl_top.addStretch()
-
-        self.admin_pending_list = QListWidget()
-        self.admin_pending_list.itemSelectionChanged.connect(lambda: None)
-
-        # Boutons d'action
-        hl = QHBoxLayout()
-        approve_btn = QPushButton("✅ Valider")
-        approve_btn.clicked.connect(self.approve_selected_film)
-        delete_btn = QPushButton("🗑️ Supprimer")
-        delete_btn.clicked.connect(self.delete_selected_film)
-        view_btn = QPushButton("🔍 Voir détails")
-        view_btn.clicked.connect(self.view_pending_film_details)
-
-        hl.addWidget(view_btn)
-        hl.addWidget(approve_btn)
-        hl.addWidget(delete_btn)
-        hl.addStretch()
-
-        # Logs récents pour le film sélectionné
-        self.admin_logs_label = QLabel("Sélectionnez un film pour voir les logs")
-        self.admin_logs_label.setWordWrap(True)
-
-        layout.addLayout(hl_top)
-        layout.addWidget(self.admin_pending_list)
-        layout.addLayout(hl)
-        layout.addWidget(self.admin_logs_label)
-
-        tab.setLayout(layout)
-        self.tabs.addTab(tab, "⚙️ Administration")
-
-        # Chargement initial
-        self.refresh_admin_tab()
-
-    def refresh_admin_tab(self):
-        """Recharge la liste des films en attente"""
-        try:
-            pending = self.film_controller.get_pending_films()
-            self.admin_pending_list.clear()
-            for film in pending:
-                item = QListWidgetItem(f"{film.id} - {film.title} ({film.release_date.year}) - {film.genre}")
-                item.setData(Qt.ItemDataRole.UserRole, film)
-                self.admin_pending_list.addItem(item)
-
-            self.admin_logs_label.setText(f"{len(pending)} film(s) en attente")
-        except Exception as e:
-            QMessageBox.critical(self, "Erreur", f"Impossible de charger les films en attente: {e}")
-
-    def _get_selected_pending_film(self):
-        items = self.admin_pending_list.selectedItems()
-        if not items:
-            QMessageBox.information(self, "Info", "Veuillez sélectionner un film")
-            return None
-        return items[0].data(Qt.ItemDataRole.UserRole)
-
-    def approve_selected_film(self):
-        """Valide le film sélectionné via FilmController"""
-        # Autorisation: seul un Admin peut valider
-        if not isinstance(self.user, Admin):
-            QMessageBox.critical(self, "Accès refusé", "Vous n'avez pas les droits pour valider des films.")
-            return
-        film = self._get_selected_pending_film()
-        if not film:
-            return
-        # Confirmer
-        ret = QMessageBox.question(self, "Confirmer", f"Valider le film '{film.title}' ?")
-        if ret != QMessageBox.StandardButton.Yes and ret != QMessageBox.StandardButton.Ok:
-            return
-
-        # Trouver un admin user correct — self.user devrait être un Admin
-        try:
-            success = self.film_controller.validate_film(film.id, self.user)
-            if success:
-                QMessageBox.information(self, "Succès", "Film validé avec succès")
-                self.refresh_admin_tab()
-            else:
-                QMessageBox.critical(self, "Erreur", "Erreur lors de la validation du film")
-        except Exception as e:
-            QMessageBox.critical(self, "Erreur", f"Erreur lors de la validation: {e}")
-
-    def delete_selected_film(self):
-        """Supprime le film sélectionné via FilmController"""
-        # Autorisation: seul un Admin peut supprimer
-        if not isinstance(self.user, Admin):
-            QMessageBox.critical(self, "Accès refusé", "Vous n'avez pas les droits pour supprimer des films.")
-            return
-        film = self._get_selected_pending_film()
-        if not film:
-            return
-        ret = QMessageBox.question(self, "Confirmer", f"Supprimer le film '{film.title}' ? Cette action est irréversible.")
-        if ret != QMessageBox.StandardButton.Yes and ret != QMessageBox.StandardButton.Ok:
-            return
-
-        try:
-            success = self.film_controller.delete_film(film.id, self.user)
-            if success:
-                QMessageBox.information(self, "Succès", "Film supprimé")
-                self.refresh_admin_tab()
-            else:
-                QMessageBox.critical(self, "Erreur", "Erreur lors de la suppression du film")
-        except Exception as e:
-            QMessageBox.critical(self, "Erreur", f"Erreur lors de la suppression: {e}")
-
-    def view_pending_film_details(self):
-        """Affiche les détails (dialog) du film sélectionné"""
-        film = self._get_selected_pending_film()
-        if not film:
-            return
-
-        # Réutiliser FilmDialog en mode édition pour visualiser/éditer
-        dialog = FilmDialog(self.film_controller, self.user, film, parent=self)
-        if dialog.exec() == QDialog.DialogCode.Accepted:
-            # Après modification, rafraîchir
-            self.refresh_admin_tab()
-
-def main():
-    app = QApplication(sys.argv)
-    # Pour lancer l'interface depuis ce module, ouvrir d'abord la fenêtre de connexion
-    # afin de ne pas créer d'utilisateurs ou modifier les JSON par inadvertance.
-    try:
-        from ui.login_window import LoginWindow
-        login = LoginWindow()
-        # Lors d'une connexion réussie, ouvrir la fenêtre principale
-        def _on_login(user):
-            mw = MainWindow(user)
-            mw.show()
-        login.login_success.connect(_on_login)
-        login.show()
-    except Exception:
-        # Fallback : si LoginWindow ne peut pas être importé, afficher une instance
-        # vide pour développement local sans modifier les fichiers de données.
-        from core.users import User
-        user = User.create_user(0, "Dev", "User", "dev@local", "dev", "DevPass1!")
-        window = MainWindow(user)
-        window.show()
     sys.exit(app.exec())
 
 if __name__ == '__main__':

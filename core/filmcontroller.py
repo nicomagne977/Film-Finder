@@ -234,20 +234,47 @@ class FilmController:
             return False
 
     def search_films(self, title: Optional[str] = None, genre: Optional[str] = None,
+                    start_year: Optional[int] = None, end_year: Optional[int] = None,
                     date_filter: Optional[date] = None, approved_only: bool = True) -> List[Film]:
         """
         Recherche des films selon les critères
         """
         results = []
 
+        q = title.strip().lower() if title else None
+
         for film in self.films:
             # Filtrer par statut d'approbation
             if approved_only and not film.approved:
                 continue
 
-            # Appliquer les filtres
-            if film.matches_filter(title, genre, date_filter):
-                results.append(film)
+            # Appliquer les filtres basés sur titre/genre
+            if q:
+                t = film.title.lower()
+                # Prefer prefix match like Netflix (user typed start of title)
+                if not (t.startswith(q) or q in t):
+                    continue
+            if genre and genre.lower() != film.genre.lower():
+                continue
+
+            # Date range filtering if given
+            if start_year is not None or end_year is not None:
+                y = film.release_date.year
+                if start_year is not None and y < start_year:
+                    continue
+                if end_year is not None and y > end_year:
+                    continue
+            else:
+                # fallback to single date_filter for backward compatibility
+                if date_filter:
+                    if isinstance(date_filter, date):
+                        if film.release_date != date_filter:
+                            continue
+                    else:
+                        if film.release_date.year != date_filter:
+                            continue
+
+            results.append(film)
 
         return results
 
