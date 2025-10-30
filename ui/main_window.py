@@ -215,6 +215,7 @@ class NetflixSearchHeader(QWidget):
         # Variables pour stocker les filtres actuels
         self.current_genre = None
         self.current_year = None
+        self.filters_panel = None
 
         self.init_ui()
         self.load_filter_data()
@@ -344,25 +345,27 @@ class NetflixSearchHeader(QWidget):
     def show_advanced_filters(self):
         """Affiche le panneau de filtres avancés"""
         # Supprimer l'ancien panneau s'il existe
-        if hasattr(self, 'filters_panel'):
+        if self.filters_panel:
             self.filters_panel.deleteLater()
 
-        self.filters_panel = QFrame(self.parent())
+        self.filters_panel = QFrame(self.window())
+        self.filters_panel.setWindowFlags(Qt.Dialog | Qt.FramelessWindowHint)
         self.filters_panel.setStyleSheet("""
             QFrame {
                 background-color: #1a1a1a;
-                border: 1px solid #2d2d2d;
+                border: 2px solid #2d2d2d;
                 border-radius: 8px;
-                padding: 15px;
+                padding: 20px;
             }
         """)
-        self.filters_panel.setFixedWidth(300)
+        self.filters_panel.setFixedSize(350, 250)
 
         layout = QVBoxLayout()
 
         # Titre
         title = QLabel("Filtres avances")
-        title.setStyleSheet("color: #ffffff; font-size: 16px; font-weight: bold;")
+        title.setStyleSheet("color: #ffffff; font-size: 18px; font-weight: bold; margin-bottom: 10px;")
+        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(title)
 
         # Genre
@@ -381,8 +384,9 @@ class NetflixSearchHeader(QWidget):
                 background-color: #2d2d2d;
                 border: 1px solid #424242;
                 border-radius: 4px;
-                padding: 6px;
+                padding: 8px;
                 color: #ffffff;
+                font-size: 14px;
             }
         """)
         layout.addWidget(self.genre_combo)
@@ -403,8 +407,9 @@ class NetflixSearchHeader(QWidget):
                 background-color: #2d2d2d;
                 border: 1px solid #424242;
                 border-radius: 4px;
-                padding: 6px;
+                padding: 8px;
                 color: #ffffff;
+                font-size: 14px;
             }
         """)
         layout.addWidget(self.year_combo)
@@ -421,9 +426,10 @@ class NetflixSearchHeader(QWidget):
                 background-color: #e50914;
                 border: none;
                 border-radius: 4px;
-                padding: 6px 12px;
+                padding: 8px 16px;
                 color: white;
                 font-weight: bold;
+                font-size: 14px;
             }
             QPushButton:hover {
                 background-color: #f40612;
@@ -435,9 +441,10 @@ class NetflixSearchHeader(QWidget):
                 background-color: #555555;
                 border: none;
                 border-radius: 4px;
-                padding: 6px 12px;
+                padding: 8px 16px;
                 color: white;
                 font-weight: bold;
+                font-size: 14px;
             }
             QPushButton:hover {
                 background-color: #666666;
@@ -450,18 +457,24 @@ class NetflixSearchHeader(QWidget):
 
         self.filters_panel.setLayout(layout)
 
-        # Positionner sous le bouton filtres
-        pos = self.filters_btn.mapToGlobal(self.filters_btn.rect().bottomLeft())
-        parent_pos = self.parent().mapFromGlobal(pos)
-        self.filters_panel.move(parent_pos.x(), parent_pos.y() + 5)
+        # Centrer la fenêtre sur l'écran
+        window_rect = self.window().geometry()
+        panel_width = self.filters_panel.width()
+        panel_height = self.filters_panel.height()
+
+        x = window_rect.x() + (window_rect.width() - panel_width) // 2
+        y = window_rect.y() + (window_rect.height() - panel_height) // 3  # Un peu plus haut que le centre
+
+        self.filters_panel.move(x, y)
         self.filters_panel.show()
 
     def hide_advanced_filters(self):
         """Masque le panneau de filtres"""
-        if hasattr(self, 'filters_panel'):
+        if self.filters_panel:
             self.filters_panel.hide()
             self.filters_panel.deleteLater()
-            delattr(self, 'filters_panel')
+            self.filters_panel = None
+        self.filters_btn.setChecked(False)
 
     def apply_filters(self):
         """Applique les filtres et lance la recherche"""
@@ -477,18 +490,16 @@ class NetflixSearchHeader(QWidget):
 
         self.search_requested.emit(criteria)
         self.hide_advanced_filters()
-        self.filters_btn.setChecked(False)
 
     def clear_filters(self):
         """Réinitialise tous les filtres"""
         self.search_input.clear()
-        self.genre_combo.setCurrentIndex(0)
-        self.year_combo.setCurrentIndex(0)
         self.current_genre = None
         self.current_year = None
 
         criteria = {'title': None, 'genre': None, 'year': None}
         self.search_requested.emit(criteria)
+        self.hide_advanced_filters()
 
     def perform_search(self):
         """Lance la recherche avec les critères actuels"""
@@ -502,6 +513,8 @@ class NetflixSearchHeader(QWidget):
             self.search_requested.emit(criteria)
         except Exception as e:
             print(f"Erreur lors de la recherche: {e}")
+
+# ... (le reste du code reste identique, NetflixGridView, FilmViewDialog, FilmEditDialog, MainWindow, etc.)
 
 class NetflixGridView(QWidget):
     """Vue principale style Netflix avec plusieurs rangées"""
