@@ -9,13 +9,30 @@ from PyQt5.QtWidgets import (
     QFrame
 )
 from PyQt5.QtCore import Qt, QDate, QSize, pyqtSignal, QUrl, QPropertyAnimation, QEasingCurve, pyqtProperty, QTimer
+from PyQt5.QtCore import Qt, QCoreApplication
 try:
     from PyQt5.QtMultimedia import QMediaPlayer, QMediaContent
     from PyQt5.QtMultimediaWidgets import QVideoWidget
     HAVE_VIDEO = True
 except Exception:
     HAVE_VIDEO = False
+# Ajoutez ces imports pour WebEngine
+QCoreApplication.setAttribute(Qt.AA_ShareOpenGLContexts)
+from PyQt5.QtWebEngineWidgets import QWebEngineView, QWebEngineSettings
+try:
+    from PyQt5.QtWebEngineWidgets import QWebEngineView, QWebEngineSettings
+    HAVE_WEBENGINE = True
+    print("Import reussi")
+except ImportError:
+    HAVE_WEBENGINE = False
+    print("C'est la merde pour toi !")
 from PyQt5.QtGui import QFont, QPixmap, QIcon, QPainter, QPainterPath, QColor, QBrush
+
+import subprocess
+import tempfile
+import os
+import threading
+from PyQt5.QtCore import QThread, pyqtSignal
 
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
@@ -623,51 +640,439 @@ class NetflixGridView(QWidget):
             """)
             self.rows_layout.addWidget(error_label)
 
+
+
+class VideoDownloadThread(QThread):
+    """Thread pour télécharger la vidéo en arrière-plan"""
+
+    progress_signal = pyqtSignal(str)
+    finished_signal = pyqtSignal(str)
+    error_signal = pyqtSignal(str)
+
+    def __init__(self, youtube_url):
+        super().__init__()
+        self.youtube_url = youtube_url
+        self.temp_dir = "/mnt/c/Users/utilisateur/Desktop/UFSC/POO/Film_finder/data/"
+        self.video_path = None
+
+    def run(self):
+        try:
+            self.progress_signal.emit("📥 Téléchargement de la vidéo...")
+
+            # Nom de fichier temporaire unique
+            import uuid
+            filename = f"film_finder_trailer.mp4"
+            self.video_path = os.path.join(self.temp_dir, filename)
+
+            # Options yt-dlp
+            ydl_opts = {
+                'format': 'best[height<=720]',  # Qualité 720p max
+                'outtmpl': self.video_path,
+                'quiet': True,
+            }
+
+            # Téléchargement
+            import yt_dlp
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                ydl.download([self.youtube_url])
+
+            if os.path.exists(self.video_path):
+                self.progress_signal.emit("✅ Vidéo téléchargée! Lancement de VLC...")
+                self.finished_signal.emit(self.video_path)
+            else:
+                self.error_signal.emit("❌ Échec du téléchargement")
+
+        except Exception as e:
+            self.error_signal.emit(f"❌ Erreur: {str(e)}")
+
 class FilmViewDialog(QDialog):
-    """Read-only film viewer"""
+    """Vue détaillée du film avec lecture VLC intégrée"""
 
     def __init__(self, film, parent=None):
         super().__init__(parent)
         self.film = film
-        self.setWindowTitle(film.title)
-        self.setMinimumSize(480, 360)
+        self.video_path = None
+        self.download_thread = None
+        self.vlc_process = None
+
+        self.setWindowTitle(f"Film Finder - {film.title}")
+        self.setMinimumSize(900, 700)
+        self.setStyleSheet("""
+            FilmViewDialog {
+                background-color: #1a1a1a;
+                color: #ffffff;
+            }
+        """)
         self.init_ui()
 
     def init_ui(self):
         layout = QVBoxLayout()
+        layout.setContentsMargins(20, 20, 20, 20)
+        layout.setSpacing(20)
 
-        title = QLabel(self.film.title)
-        title.setFont(QFont('Arial', 16, QFont.Weight.Bold))
-        layout.addWidget(title)
+        # Titre principal
+        title_label = QLabel(self.film.title)
+        title_label.setStyleSheet("""
+            QLabel {
+                color: #ffffff;
+                font-size: 28px;
+                font-weight: bold;
+                padding: 10px 0px;
+            }
+        """)
+        title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(title_label)
 
-        # Poster + description
-        hl = QHBoxLayout()
-        poster = QLabel()
-        poster.setFixedSize(160, 240)
-        poster.setScaledContents(True)
-        try:
-            if self.film.poster_path and os.path.exists(self.film.poster_path):
-                poster.setPixmap(QPixmap(self.film.poster_path))
-        except Exception:
-            pass
-        hl.addWidget(poster)
+        # Conteneur principal (poster + infos + trailer)
+        main_container = QHBoxLayout()
+        main_container.setSpacing(30)
 
-        desc = QTextEdit()
-        desc.setReadOnly(True)
-        desc.setText(self.film.description or '(Pas de description)')
-        desc.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
-        hl.addWidget(desc)
+        # Colonne gauche - Poster et infos
+        left_column = QVBoxLayout()
+        left_column.setSpacing(15)
 
-        layout.addLayout(hl)
+        poster_label = QLabel()
+        poster_label.setFixedSize(300, 450)
+        poster_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        poster_label.setStyleSheet("""
+            QLabel {
+                background-color: #2d2d2d;
+                border-radius: 8px;
+                padding: 10px;
+            }
+        """)
 
-        btns = QHBoxLayout()
-        btns.addStretch()
-        close = QPushButton('Fermer')
-        close.clicked.connect(self.accept)
-        btns.addWidget(close)
-        layout.addLayout(btns)
+        self.load_poster(poster_label)
+        left_column.addWidget(poster_label)
 
+        # Informations sous le poster
+        info_widget = QWidget()
+        info_widget.setStyleSheet("""
+            QWidget {
+                background-color: #2d2d2d;
+                border-radius: 8px;
+                padding: 15px;
+            }
+        """)
+        info_layout = QVBoxLayout()
+
+        # Genre
+        genre_label = QLabel(f"<b>Genre:</b> {self.film.genre}")
+        genre_label.setStyleSheet("color: #cccccc; font-size: 14px;")
+        info_layout.addWidget(genre_label)
+
+        # Date de sortie
+        release_date = self.film.release_date
+        if hasattr(release_date, 'strftime'):
+            date_str = release_date.strftime("%d/%m/%Y")
+        else:
+            date_str = str(release_date)
+        date_label = QLabel(f"<b>Date de sortie:</b> {date_str}")
+        date_label.setStyleSheet("color: #cccccc; font-size: 14px;")
+        info_layout.addWidget(date_label)
+
+        # Statut d'approbation
+        status_label = QLabel(f"<b>Statut:</b> {'Approuvé' if getattr(self.film, 'approved', False) else 'En attente'}")
+        status_label.setStyleSheet("color: #cccccc; font-size: 14px;")
+        info_layout.addWidget(status_label)
+
+        info_widget.setLayout(info_layout)
+        left_column.addWidget(info_widget)
+
+        main_container.addLayout(left_column)
+
+        # Colonne droite - Description et Trailer
+        right_column = QVBoxLayout()
+        right_column.setSpacing(20)
+
+        # Description
+        desc_group = QWidget()
+        desc_group.setStyleSheet("""
+            QWidget {
+                background-color: #2d2d2d;
+                border-radius: 8px;
+                padding: 0px;
+            }
+        """)
+        desc_layout = QVBoxLayout()
+
+        desc_title = QLabel("Description")
+        desc_title.setStyleSheet("""
+            QLabel {
+                color: #ffffff;
+                font-size: 18px;
+                font-weight: bold;
+                padding: 15px 15px 5px 15px;
+            }
+        """)
+        desc_layout.addWidget(desc_title)
+
+        desc_text = QTextEdit()
+        desc_text.setReadOnly(True)
+        desc_text.setPlainText(self.film.description or "Aucune description disponible.")
+        desc_text.setStyleSheet("""
+            QTextEdit {
+                background-color: transparent;
+                border: none;
+                color: #cccccc;
+                font-size: 14px;
+                padding: 0px 15px 15px 15px;
+                line-height: 1.4;
+            }
+        """)
+        desc_text.setFixedHeight(150)
+        desc_layout.addWidget(desc_text)
+
+        desc_group.setLayout(desc_layout)
+        right_column.addWidget(desc_group)
+
+        # Trailer - Lecture VLC intégrée
+        trailer_group = QWidget()
+        trailer_group.setStyleSheet("""
+            QWidget {
+                background-color: #2d2d2d;
+                border-radius: 8px;
+                padding: 25px;
+            }
+        """)
+        trailer_layout = QVBoxLayout()
+
+        trailer_title = QLabel("Bande-annonce")
+        trailer_title.setStyleSheet("""
+            QLabel {
+                color: #ffffff;
+                font-size: 22px;
+                font-weight: bold;
+                margin-bottom: 20px;
+                text-align: center;
+            }
+        """)
+        trailer_layout.addWidget(trailer_title)
+
+        if self.film.trailer_url:
+            # Bouton de téléchargement et lecture
+            self.download_btn = QPushButton("🎬 Regarder la bande-annonce (VLC)")
+            self.download_btn.setStyleSheet("""
+                QPushButton {
+                    background-color: #e50914;
+                    border: none;
+                    border-radius: 8px;
+                    padding: 15px 25px;
+                    color: white;
+                    font-weight: bold;
+                    font-size: 16px;
+                    margin: 10px;
+                }
+                QPushButton:hover:!disabled {
+                    background-color: #f40612;
+                }
+                QPushButton:disabled {
+                    background-color: #666666;
+                    color: #aaaaaa;
+                }
+            """)
+            self.download_btn.clicked.connect(self.download_and_play)
+            trailer_layout.addWidget(self.download_btn)
+
+            # Label de statut
+            self.status_label = QLabel("Prêt à télécharger et lire la bande-annonce")
+            self.status_label.setStyleSheet("""
+                QLabel {
+                    color: #88ff88;
+                    font-size: 12px;
+                    padding: 10px;
+                    background-color: #1a2a1a;
+                    border-radius: 4px;
+                    margin: 5px;
+                }
+            """)
+            self.status_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.status_label.setWordWrap(True)
+            trailer_layout.addWidget(self.status_label)
+
+            # Bouton de secours (navigateur)
+            browser_btn = QPushButton("🌐 Ouvrir dans le navigateur (secours)")
+            browser_btn.setStyleSheet("""
+                QPushButton {
+                    background-color: #555555;
+                    border: none;
+                    border-radius: 6px;
+                    padding: 10px 15px;
+                    color: white;
+                    font-weight: bold;
+                    font-size: 12px;
+                    margin-top: 10px;
+                }
+                QPushButton:hover {
+                    background-color: #666666;
+                }
+            """)
+            browser_btn.clicked.connect(self.open_in_browser)
+            trailer_layout.addWidget(browser_btn)
+
+        else:
+            no_trailer_label = QLabel("Aucune bande-annonce disponible")
+            no_trailer_label.setStyleSheet("color: #888888; padding: 40px;")
+            no_trailer_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            trailer_layout.addWidget(no_trailer_label)
+
+        trailer_group.setLayout(trailer_layout)
+        right_column.addWidget(trailer_group)
+
+        main_container.addLayout(right_column)
+        layout.addLayout(main_container)
+
+        # Boutons de fermeture
+        button_layout = QHBoxLayout()
+        button_layout.addStretch()
+
+        close_btn = QPushButton('Fermer')
+        close_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #e50914;
+                border: none;
+                border-radius: 4px;
+                padding: 10px 20px;
+                color: white;
+                font-weight: bold;
+                font-size: 14px;
+                min-width: 100px;
+            }
+            QPushButton:hover {
+                background-color: #f40612;
+            }
+        """)
+        close_btn.clicked.connect(self.close_dialog)
+        button_layout.addWidget(close_btn)
+
+        layout.addLayout(button_layout)
         self.setLayout(layout)
+
+    def download_and_play(self):
+        """Télécharge et lit la vidéo avec VLC"""
+        if not self.film.trailer_url:
+            return
+
+        # Désactiver le bouton pendant le téléchargement
+        self.download_btn.setEnabled(False)
+        self.status_label.setText("📥 Préparation du téléchargement...")
+
+        # Lancer le téléchargement dans un thread séparé
+        self.download_thread = VideoDownloadThread(self.film.trailer_url)
+        self.download_thread.progress_signal.connect(self.update_status)
+        self.download_thread.finished_signal.connect(self.launch_vlc)
+        self.download_thread.error_signal.connect(self.download_error)
+        self.download_thread.start()
+
+    def update_status(self, message):
+        """Met à jour le statut du téléchargement"""
+        self.status_label.setText(message)
+
+    def launch_vlc(self, video_path):
+        """Lance VLC avec la vidéo téléchargée"""
+        try:
+            self.video_path = video_path
+            self.status_label.setText("🚀 Lancement de VLC...")
+
+            # Convertir le chemin pour Windows si sous WSL
+            if os.name == 'posix' and '/mnt/c/' in video_path:
+                vlc_path = video_path.replace("/mnt/c/", "C:\\").replace("/", "\\")
+            else:
+                vlc_path = video_path
+
+            # Chercher VLC aux emplacements communs
+            vlc_executable = "/mnt/c/Program Files/VideoLAN/VLC/vlc.exe"
+
+            if vlc_executable:
+                # Lancer VLC
+                self.vlc_process = subprocess.Popen([vlc_executable, vlc_path])
+                self.status_label.setText("✅ VLC lancé! La vidéo sera supprimée à la fermeture.")
+
+                # Réactiver le bouton
+                self.download_btn.setEnabled(True)
+                self.download_btn.setText("🎬 Relancer la bande-annonce")
+            else:
+                self.download_error("VLC non trouvé. Installez VLC ou utilisez le bouton navigateur.")
+
+        except Exception as e:
+            self.download_error(f"Erreur lancement VLC: {str(e)}")
+
+    def find_vlc(self):
+        """Trouve l'exécutable VLC"""
+        possible_paths = [
+            # Windows
+            "C:\\Program Files\\VideoLAN\\VLC\\vlc.exe",
+            "C:\\Program Files (x86)\\VideoLAN\\VLC\\vlc.exe",
+            # Linux
+            "/usr/bin/vlc",
+            "/usr/local/bin/vlc",
+            # WSL
+            "/mnt/c/Program Files/VideoLAN/VLC/vlc.exe",
+            "/mnt/c/Program Files (x86)/VideoLAN/VLC/vlc.exe",
+        ]
+
+        for path in possible_paths:
+            if os.path.exists(path):
+                return path
+        return None
+
+    def download_error(self, error_message):
+        """Gère les erreurs de téléchargement"""
+        self.status_label.setText(error_message)
+        self.status_label.setStyleSheet("color: #ff8888; background-color: #2a1a1a; padding: 10px; border-radius: 4px;")
+        self.download_btn.setEnabled(True)
+
+    def open_in_browser(self):
+        """Ouvre le trailer dans le navigateur (secours)"""
+        try:
+            import webbrowser
+            webbrowser.open(self.film.trailer_url)
+        except Exception as e:
+            QMessageBox.warning(self, "Erreur", f"Impossible d'ouvrir le navigateur:\n{str(e)}")
+
+    def load_poster(self, poster_label):
+        """Charge l'image du poster"""
+        poster_path = getattr(self.film, 'poster_path', '')
+
+        if poster_path and os.path.exists(poster_path):
+            pixmap = QPixmap(poster_path)
+            scaled_pixmap = pixmap.scaled(280, 420, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            poster_label.setPixmap(scaled_pixmap)
+        else:
+            placeholder = QPixmap(280, 420)
+            placeholder.fill(QColor('#2d2d2d'))
+
+            painter = QPainter(placeholder)
+            painter.setPen(QColor('#666666'))
+            painter.setFont(QFont('Arial', 12, QFont.Weight.Bold))
+            painter.drawText(placeholder.rect(), Qt.AlignmentFlag.AlignCenter, "Image non disponible")
+            painter.end()
+
+            poster_label.setPixmap(placeholder)
+
+    def close_dialog(self):
+        """Ferme le dialogue et nettoie les fichiers temporaires"""
+        # Arrêter le thread de téléchargement s'il est en cours
+        if self.download_thread and self.download_thread.isRunning():
+            self.download_thread.terminate()
+            self.download_thread.wait()
+
+        # Supprimer le fichier vidéo temporaire
+        if self.video_path and os.path.exists(self.video_path):
+            try:
+                os.remove(self.video_path)
+                print(f"✅ Fichier temporaire supprimé: {self.video_path}")
+            except Exception as e:
+                print(f"⚠️ Impossible de supprimer le fichier: {e}")
+
+        # Fermer VLC s'il est encore ouvert
+        if self.vlc_process:
+            try:
+                self.vlc_process.terminate()
+            except:
+                pass
+
+        self.accept()
 
 class FilmEditDialog(QDialog):
     """Dialog to propose a new film (or edit if needed)."""

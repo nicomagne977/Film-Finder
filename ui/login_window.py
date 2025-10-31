@@ -164,20 +164,25 @@ class LoginWindow(QMainWindow):
         # Signup section
         signup_h = QHBoxLayout()
         signup_h.addWidget(QLabel("Première visite sur Film Finder ?"))
+        premiere_visite_label.setStyleSheet('color: white;')  # Ajouter cette ligne
         signup_btn = QPushButton('Inscrivez-vous maintenant')
+        signup_btn.setStyleSheet('color: white;')  # Ajouter cette ligne
         signup_btn.setProperty('flat', True)
         signup_h.addWidget(signup_btn)
         card_layout.addLayout(signup_h)
 
         # Footer links
         footer = QHBoxLayout()
-        footer.addWidget(QLabel('Conditions d\'utilisation'))
+        conditions_label = QLabel('Conditions d\'utilisation')
+        conditions_label.setStyleSheet('color: white;')  # Ajouter cette ligne
+        footer.addWidget(conditions_label)
         footer.addStretch()
-        footer.addWidget(QLabel('Centre d\'aide'))
-        footer.addWidget(QLabel('Langue:'))
-        lang = QComboBox()
-        lang.addItems(['Français', 'English'])
-        footer.addWidget(lang)
+        centre_aide_label = QLabel('Centre d\'aide')
+        centre_aide_label.setStyleSheet('color: white;')  # Ajouter cette ligne
+        footer.addWidget(centre_aide_label)
+        langue_label = QLabel('Langue:')
+        langue_label.setStyleSheet('color: white;')  # Ajouter cette ligne
+        footer.addWidget(langue_label)
         card_layout.addLayout(footer)
 
         card.setLayout(card_layout)
