@@ -239,34 +239,9 @@
       "approved": true,
       "added_by_user_id": 2,
       "logs": []
-    },
-    {
-      "id": 21,
-      "title": "Test",
-      "genre": "Science-Fiction",
-      "release_date": "2025-10-31",
-      "poster_path": "action",
-      "trailer_url": "",
-      "description": "description test je me suis trompé",
-      "approved": false,
-      "added_by_user_id": 4,
-      "logs": [
-        {
-          "action": "proposed",
-          "user_id": 4,
-          "timestamp": "2025-10-31T23:21:58.842402",
-          "film_id": 21
-        },
-        {
-          "action": "updated: description updated",
-          "user_id": 4,
-          "timestamp": "2025-11-01T00:53:32.305507",
-          "film_id": 21
-        }
-      ]
     }
   ],
-  "last_updated": "2025-11-01T00:53:32.360494",
-  "total_films": 21,
+  "last_updated": "2025-10-29T00:00:00",
+  "total_films": 20,
   "approved_films": 20
 }

@@ -101,6 +101,14 @@ class LoginWindow(QMainWindow):
         self.auth = AuthController()
         self.setWindowTitle('Film Finder - Connexion')
         self.setMinimumSize(900, 600)
+        self.stacked_widget = QStackedWidget()
+        # Create login and signup forms
+        self.signup_form = self.create_signup_form()
+
+        # Ajouter les formulaires au stacked widget
+        #self.stacked_widget.addWidget(self.login_form)
+        self.stacked_widget.addWidget(self.signup_form)
+        #self.stacked_widget.setCurrentWidget(self.login_form)
         self.init_ui()
 
     def init_ui(self):
@@ -163,11 +171,23 @@ class LoginWindow(QMainWindow):
 
         # Signup section
         signup_h = QHBoxLayout()
-        signup_h.addWidget(QLabel("Première visite sur Film Finder ?"))
-        premiere_visite_label.setStyleSheet('color: white;')  # Ajouter cette ligne
+        firstvisit = QLabel("Première visite sur Film Finder ?")
+        firstvisit.setStyleSheet('color: white;')  # Ajouter cette ligne
         signup_btn = QPushButton('Inscrivez-vous maintenant')
-        signup_btn.setStyleSheet('color: white;')  # Ajouter cette ligne
+        signup_btn.setStyleSheet('''
+            QPushButton {
+                color: white;
+                background: transparent;
+                border: none;
+                text-decoration: underline;
+            }
+            QPushButton:hover {
+                color: #E50914;
+            }
+        ''')  # Ajouter cette ligne
         signup_btn.setProperty('flat', True)
+        signup_btn.clicked.connect(self.show_signup_form)
+        signup_h.addWidget(firstvisit)
         signup_h.addWidget(signup_btn)
         card_layout.addLayout(signup_h)
 
@@ -190,7 +210,21 @@ class LoginWindow(QMainWindow):
         content.addStretch()
 
         main_layout.addLayout(content)
-        central.setLayout(main_layout)
+
+        # ⚡ NOUVELLE PARTIE — transformer ce layout en page de connexion
+        login_page = QWidget()
+        login_page.setLayout(main_layout)
+
+        # Ajouter la page login + signup dans le stacked widget
+        self.stacked_widget.addWidget(login_page)
+        self.stacked_widget.setCurrentWidget(login_page)
+        self.stacked_widget.addWidget(self.signup_form)
+
+        # Mettre le stacked widget dans la fenêtre principale
+        central_layout = QVBoxLayout()
+        central_layout.addWidget(self.stacked_widget)
+        central.setLayout(central_layout)
+        self.setCentralWidget(central)
 
         # Load style
         try:
@@ -205,9 +239,156 @@ class LoginWindow(QMainWindow):
         self.email_field.edit.returnPressed.connect(self.password_field.edit.setFocus)
         self.password_field.edit.returnPressed.connect(self.on_login_clicked)
 
+
     def show_error(self, message: str):
         self.error_label.setText(message)
         self.error_label.setVisible(True)
+
+
+    def create_signup_form(self):
+        # Widget principal du formulaire
+        signup_widget = QWidget()
+        main_layout = QVBoxLayout()
+        main_layout.setContentsMargins(40, 20, 40, 20)
+        main_layout.setSpacing(15)
+
+        # Header
+        header = QHBoxLayout()
+        logo = QLabel('FILM FINDER')
+        logo.setStyleSheet('color: #E50914; font-weight: 800; font-size: 20px;')
+        header.addWidget(logo, alignment=Qt.AlignLeft)
+        header.addStretch()
+        help_btn = QPushButton('Aide')
+        help_btn.setProperty('flat', True)
+        header.addWidget(help_btn, alignment=Qt.AlignRight)
+        main_layout.addLayout(header)
+
+        # Content area
+        content = QHBoxLayout()
+        content.addStretch()
+
+        card = QFrame()
+        card.setObjectName('formFrame')
+        card.setFixedWidth(520)
+        card_layout = QVBoxLayout()
+        card_layout.setSpacing(12)
+
+        title = QLabel("Créer un compte")
+        title.setFont(QFont('Segoe UI', 20, QFont.Weight.Bold))
+        title.setStyleSheet('color: white;')
+        card_layout.addWidget(title)
+
+        # Champs d'inscription
+        self.signup_first_name_field = FloatingLineEdit('Prénom')
+        self.signup_last_name_field = FloatingLineEdit('Nom')
+        self.signup_email_field = FloatingLineEdit('Email')
+        self.signup_username_field = FloatingLineEdit('Nom d\'utilisateur')
+        self.signup_password_field = FloatingLineEdit('Mot de passe')
+        self.signup_password_field.setEchoMode(QLineEdit.EchoMode.Password)
+        self.signup_confirm_field = FloatingLineEdit('Confirmer le mot de passe')
+        self.signup_confirm_field.setEchoMode(QLineEdit.EchoMode.Password)
+
+        for field in [
+            self.signup_first_name_field,
+            self.signup_last_name_field,
+            self.signup_email_field,
+            self.signup_username_field,
+            self.signup_password_field,
+            self.signup_confirm_field
+        ]:
+            card_layout.addWidget(field)
+
+        # Checkbox admin
+        self.signup_admin_checkbox = QCheckBox("Administrateur ?")
+        self.signup_admin_checkbox.setStyleSheet('color: white;')
+        card_layout.addWidget(self.signup_admin_checkbox)
+
+        # Label d'erreur
+        self.signup_error_label = QLabel('')
+        self.signup_error_label.setObjectName('errorLabel')
+        self.signup_error_label.setVisible(False)
+        card_layout.addWidget(self.signup_error_label)
+
+        # Bouton créer le compte
+        self.signup_button = QPushButton('Créer le compte')
+        self.signup_button.clicked.connect(self.on_signup_clicked)
+        card_layout.addWidget(self.signup_button)
+
+        # Lien retour au login
+        login_h = QHBoxLayout()
+        deja_compte_label = QLabel("Déjà un compte ?")
+        deja_compte_label.setStyleSheet('color: white;')
+        login_h.addWidget(deja_compte_label)
+        login_btn = QPushButton('Connectez-vous')
+        login_btn.setStyleSheet('''
+            QPushButton {
+                color: white;
+                background: transparent;
+                border: none;
+                text-decoration: underline;
+            }
+            QPushButton:hover {
+                color: #E50914;
+            }
+        ''')
+        login_btn.setProperty('flat', True)
+        login_btn.clicked.connect(self.show_login_form)
+        login_h.addWidget(login_btn)
+        card_layout.addLayout(login_h)
+
+        card.setLayout(card_layout)
+        content.addWidget(card)
+        content.addStretch()
+        main_layout.addLayout(content)
+        signup_widget.setLayout(main_layout)
+
+        # ⚡ Ajouter scroll pour petites fenêtres
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setWidget(signup_widget)
+        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        scroll_area.setStyleSheet("border: none;")
+
+        return scroll_area
+
+
+
+
+    def show_signup_form(self):
+        self.stacked_widget.setCurrentWidget(self.signup_form)  # Index 1 = signup
+
+    def show_login_form(self):
+        self.stacked_widget.setCurrentIndex(0)  # Index 0 = login
+
+    def on_signup_clicked(self):
+        first_name = self.signup_first_name_field.text().strip()
+        last_name = self.signup_last_name_field.text().strip()
+        email = self.signup_email_field.text().strip()
+        username = self.signup_username_field.text().strip()
+        password = self.signup_password_field.text()
+        confirm = self.signup_confirm_field.text()
+        is_admin = self.signup_admin_checkbox.isChecked()
+
+        # Validation simple
+        if not all([first_name, last_name, email, username, password, confirm]):
+            self.signup_error_label.setText('Veuillez remplir tous les champs')
+            self.signup_error_label.setVisible(True)
+            return
+
+        if password != confirm:
+            self.signup_error_label.setText('Les mots de passe ne correspondent pas')
+            self.signup_error_label.setVisible(True)
+            return
+
+        # Ici appeler la fonction de création utilisateur, par ex :
+        self.auth.register_user(first_name, last_name, email, username, password, is_admin)
+        self.signup_error_label.setText('Inscription réussie ! Vous pouvez vous connecter.')
+        self.signup_error_label.setVisible(True)
+
+        # Retourner au formulaire de login après inscription
+        QTimer.singleShot(1500, self.show_login_form)
+
+
 
     def on_login_clicked(self):
         email = self.email_field.text().strip()

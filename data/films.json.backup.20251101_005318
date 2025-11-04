@@ -247,7 +247,7 @@
       "release_date": "2025-10-31",
       "poster_path": "action",
       "trailer_url": "",
-      "description": "description test je me suis trompé",
+      "description": "description test",
       "approved": false,
       "added_by_user_id": 4,
       "logs": [
@@ -256,17 +256,30 @@
           "user_id": 4,
           "timestamp": "2025-10-31T23:21:58.842402",
           "film_id": 21
-        },
+        }
+      ]
+    },
+    {
+      "id": 22,
+      "title": "fbdufb",
+      "genre": "Action",
+      "release_date": "2025-10-31",
+      "poster_path": null,
+      "trailer_url": "",
+      "description": "sndifb",
+      "approved": false,
+      "added_by_user_id": 4,
+      "logs": [
         {
-          "action": "updated: description updated",
+          "action": "proposed",
           "user_id": 4,
-          "timestamp": "2025-11-01T00:53:32.305507",
-          "film_id": 21
+          "timestamp": "2025-10-31T23:56:05.586723",
+          "film_id": 22
         }
       ]
     }
   ],
-  "last_updated": "2025-11-01T00:53:32.360494",
-  "total_films": 21,
+  "last_updated": "2025-10-31T23:56:05.620038",
+  "total_films": 22,
   "approved_films": 20
 }

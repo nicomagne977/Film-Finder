@@ -17,7 +17,27 @@
       "username": "Jean",
       "password_hash": "46708f23d682fef9aa996ecbb139bfb6c9ffdc039905ad6ad5c85a88b9411d97",
       "created_at": "2025-10-29T18:09:44.151834"
+    },
+    {
+      "id": 3,
+      "first_name": "Nicolas",
+      "last_name": "magne",
+      "email": "nico@gmail.com",
+      "username": "lasco",
+      "password_hash": "46708f23d682fef9aa996ecbb139bfb6c9ffdc039905ad6ad5c85a88b9411d97",
+      "created_at": "2025-10-31T23:08:22.202777"
+    },
+    {
+      "id": 4,
+      "first_name": "admin",
+      "last_name": "root",
+      "email": "admin@root.com",
+      "username": "admin",
+      "password_hash": "46708f23d682fef9aa996ecbb139bfb6c9ffdc039905ad6ad5c85a88b9411d97",
+      "created_at": "2025-10-31T23:14:32.454790",
+      "admin_level": 1,
+      "user_type": "admin"
     }
   ],
-  "last_updated": "2025-10-29T18:09:44.209782"
+  "last_updated": "2025-10-31T23:14:32.460978"
 }
