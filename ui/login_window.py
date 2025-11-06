@@ -99,13 +99,13 @@ class LoginWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.auth = AuthController()
-        self.setWindowTitle('Film Finder - Connexion')
+        self.setWindowTitle('Film Finder - Login')
         self.setMinimumSize(900, 600)
         self.stacked_widget = QStackedWidget()
         # Create login and signup forms
         self.signup_form = self.create_signup_form()
 
-        # Ajouter les formulaires au stacked widget
+        # Add forms to stacked widget
         #self.stacked_widget.addWidget(self.login_form)
         self.stacked_widget.addWidget(self.signup_form)
         #self.stacked_widget.setCurrentWidget(self.login_form)
@@ -125,7 +125,7 @@ class LoginWindow(QMainWindow):
         logo.setStyleSheet('color: #E50914; font-weight: 800; font-size: 20px;')
         header.addWidget(logo, alignment=Qt.AlignLeft)
         header.addStretch()
-        help_btn = QPushButton('Aide')
+        help_btn = QPushButton('Help')
         help_btn.setProperty('flat', True)
         header.addWidget(help_btn, alignment=Qt.AlignRight)
         main_layout.addLayout(header)
@@ -140,22 +140,22 @@ class LoginWindow(QMainWindow):
         card_layout = QVBoxLayout()
         card_layout.setSpacing(12)
 
-        title = QLabel("S'identifier")
+        title = QLabel("Sign In")
         title.setFont(QFont('Segoe UI', 20, QFont.Weight.Bold))
         title.setStyleSheet('color: white;')
         card_layout.addWidget(title)
 
         self.email_field = FloatingLineEdit('Email')
-        self.password_field = FloatingLineEdit('Mot de passe')
+        self.password_field = FloatingLineEdit('Password')
         self.password_field.setEchoMode(QLineEdit.EchoMode.Password)
         card_layout.addWidget(self.email_field)
         card_layout.addWidget(self.password_field)
 
         options = QHBoxLayout()
-        self.remember = QCheckBox('Se souvenir de moi')
+        self.remember = QCheckBox('Remember me')
         options.addWidget(self.remember)
         options.addStretch()
-        forgot = QPushButton('Besoin d\'aide ?')
+        forgot = QPushButton('Need help?')
         forgot.setProperty('flat', True)
         options.addWidget(forgot)
         card_layout.addLayout(options)
@@ -165,15 +165,15 @@ class LoginWindow(QMainWindow):
         self.error_label.setVisible(False)
         card_layout.addWidget(self.error_label)
 
-        self.login_button = QPushButton('Se connecter')
+        self.login_button = QPushButton('Sign In')
         self.login_button.clicked.connect(self.on_login_clicked)
         card_layout.addWidget(self.login_button)
 
         # Signup section
         signup_h = QHBoxLayout()
-        firstvisit = QLabel("Première visite sur Film Finder ?")
-        firstvisit.setStyleSheet('color: white;')  # Ajouter cette ligne
-        signup_btn = QPushButton('Inscrivez-vous maintenant')
+        firstvisit = QLabel("First time on Film Finder?")
+        firstvisit.setStyleSheet('color: white;')  # Add this line
+        signup_btn = QPushButton('Sign up now')
         signup_btn.setStyleSheet('''
             QPushButton {
                 color: white;
@@ -184,7 +184,7 @@ class LoginWindow(QMainWindow):
             QPushButton:hover {
                 color: #E50914;
             }
-        ''')  # Ajouter cette ligne
+        ''')  # Add this line
         signup_btn.setProperty('flat', True)
         signup_btn.clicked.connect(self.show_signup_form)
         signup_h.addWidget(firstvisit)
@@ -193,15 +193,15 @@ class LoginWindow(QMainWindow):
 
         # Footer links
         footer = QHBoxLayout()
-        conditions_label = QLabel('Conditions d\'utilisation')
-        conditions_label.setStyleSheet('color: white;')  # Ajouter cette ligne
+        conditions_label = QLabel('Terms of Use')
+        conditions_label.setStyleSheet('color: white;')  # Add this line
         footer.addWidget(conditions_label)
         footer.addStretch()
-        centre_aide_label = QLabel('Centre d\'aide')
-        centre_aide_label.setStyleSheet('color: white;')  # Ajouter cette ligne
+        centre_aide_label = QLabel('Help Center')
+        centre_aide_label.setStyleSheet('color: white;')  # Add this line
         footer.addWidget(centre_aide_label)
-        langue_label = QLabel('Langue:')
-        langue_label.setStyleSheet('color: white;')  # Ajouter cette ligne
+        langue_label = QLabel('Language:')
+        langue_label.setStyleSheet('color: white;')  # Add this line
         footer.addWidget(langue_label)
         card_layout.addLayout(footer)
 
@@ -211,16 +211,16 @@ class LoginWindow(QMainWindow):
 
         main_layout.addLayout(content)
 
-        # ⚡ NOUVELLE PARTIE — transformer ce layout en page de connexion
+        # ⚡ NEW PART — transform this layout into login page
         login_page = QWidget()
         login_page.setLayout(main_layout)
 
-        # Ajouter la page login + signup dans le stacked widget
+        # Add login + signup pages to stacked widget
         self.stacked_widget.addWidget(login_page)
         self.stacked_widget.setCurrentWidget(login_page)
         self.stacked_widget.addWidget(self.signup_form)
 
-        # Mettre le stacked widget dans la fenêtre principale
+        # Put stacked widget in main window
         central_layout = QVBoxLayout()
         central_layout.addWidget(self.stacked_widget)
         central.setLayout(central_layout)
@@ -246,7 +246,7 @@ class LoginWindow(QMainWindow):
 
 
     def create_signup_form(self):
-        # Widget principal du formulaire
+        # Main widget for the form
         signup_widget = QWidget()
         main_layout = QVBoxLayout()
         main_layout.setContentsMargins(40, 20, 40, 20)
@@ -258,7 +258,7 @@ class LoginWindow(QMainWindow):
         logo.setStyleSheet('color: #E50914; font-weight: 800; font-size: 20px;')
         header.addWidget(logo, alignment=Qt.AlignLeft)
         header.addStretch()
-        help_btn = QPushButton('Aide')
+        help_btn = QPushButton('Help')
         help_btn.setProperty('flat', True)
         header.addWidget(help_btn, alignment=Qt.AlignRight)
         main_layout.addLayout(header)
@@ -273,19 +273,19 @@ class LoginWindow(QMainWindow):
         card_layout = QVBoxLayout()
         card_layout.setSpacing(12)
 
-        title = QLabel("Créer un compte")
+        title = QLabel("Create Account")
         title.setFont(QFont('Segoe UI', 20, QFont.Weight.Bold))
         title.setStyleSheet('color: white;')
         card_layout.addWidget(title)
 
-        # Champs d'inscription
-        self.signup_first_name_field = FloatingLineEdit('Prénom')
-        self.signup_last_name_field = FloatingLineEdit('Nom')
+        # Signup fields
+        self.signup_first_name_field = FloatingLineEdit('First Name')
+        self.signup_last_name_field = FloatingLineEdit('Last Name')
         self.signup_email_field = FloatingLineEdit('Email')
-        self.signup_username_field = FloatingLineEdit('Nom d\'utilisateur')
-        self.signup_password_field = FloatingLineEdit('Mot de passe')
+        self.signup_username_field = FloatingLineEdit('Username')
+        self.signup_password_field = FloatingLineEdit('Password')
         self.signup_password_field.setEchoMode(QLineEdit.EchoMode.Password)
-        self.signup_confirm_field = FloatingLineEdit('Confirmer le mot de passe')
+        self.signup_confirm_field = FloatingLineEdit('Confirm Password')
         self.signup_confirm_field.setEchoMode(QLineEdit.EchoMode.Password)
 
         for field in [
@@ -298,28 +298,28 @@ class LoginWindow(QMainWindow):
         ]:
             card_layout.addWidget(field)
 
-        # Checkbox admin
-        self.signup_admin_checkbox = QCheckBox("Administrateur ?")
+        # Admin checkbox
+        self.signup_admin_checkbox = QCheckBox("Administrator?")
         self.signup_admin_checkbox.setStyleSheet('color: white;')
         card_layout.addWidget(self.signup_admin_checkbox)
 
-        # Label d'erreur
+        # Error label
         self.signup_error_label = QLabel('')
         self.signup_error_label.setObjectName('errorLabel')
         self.signup_error_label.setVisible(False)
         card_layout.addWidget(self.signup_error_label)
 
-        # Bouton créer le compte
-        self.signup_button = QPushButton('Créer le compte')
+        # Create account button
+        self.signup_button = QPushButton('Create Account')
         self.signup_button.clicked.connect(self.on_signup_clicked)
         card_layout.addWidget(self.signup_button)
 
-        # Lien retour au login
+        # Back to login link
         login_h = QHBoxLayout()
-        deja_compte_label = QLabel("Déjà un compte ?")
+        deja_compte_label = QLabel("Already have an account?")
         deja_compte_label.setStyleSheet('color: white;')
         login_h.addWidget(deja_compte_label)
-        login_btn = QPushButton('Connectez-vous')
+        login_btn = QPushButton('Sign In')
         login_btn.setStyleSheet('''
             QPushButton {
                 color: white;
@@ -342,7 +342,7 @@ class LoginWindow(QMainWindow):
         main_layout.addLayout(content)
         signup_widget.setLayout(main_layout)
 
-        # ⚡ Ajouter scroll pour petites fenêtres
+        # ⚡ Add scroll for small windows
         scroll_area = QScrollArea()
         scroll_area.setWidgetResizable(True)
         scroll_area.setWidget(signup_widget)
@@ -350,9 +350,6 @@ class LoginWindow(QMainWindow):
         scroll_area.setStyleSheet("border: none;")
 
         return scroll_area
-
-
-
 
     def show_signup_form(self):
         self.stacked_widget.setCurrentWidget(self.signup_form)  # Index 1 = signup
@@ -369,33 +366,31 @@ class LoginWindow(QMainWindow):
         confirm = self.signup_confirm_field.text()
         is_admin = self.signup_admin_checkbox.isChecked()
 
-        # Validation simple
+        # Simple validation
         if not all([first_name, last_name, email, username, password, confirm]):
-            self.signup_error_label.setText('Veuillez remplir tous les champs')
+            self.signup_error_label.setText('Please fill in all fields')
             self.signup_error_label.setVisible(True)
             return
 
         if password != confirm:
-            self.signup_error_label.setText('Les mots de passe ne correspondent pas')
+            self.signup_error_label.setText('Passwords do not match')
             self.signup_error_label.setVisible(True)
             return
 
-        # Ici appeler la fonction de création utilisateur, par ex :
+        # Here call user creation function, for example:
         self.auth.register_user(first_name, last_name, email, username, password, is_admin)
-        self.signup_error_label.setText('Inscription réussie ! Vous pouvez vous connecter.')
+        self.signup_error_label.setText('Registration successful! You can now sign in.')
         self.signup_error_label.setVisible(True)
 
-        # Retourner au formulaire de login après inscription
+        # Return to login form after registration
         QTimer.singleShot(1500, self.show_login_form)
-
-
 
     def on_login_clicked(self):
         email = self.email_field.text().strip()
         pwd = self.password_field.text()
         # simple validation
         if not email or not pwd:
-            self.show_error('Veuillez remplir tous les champs')
+            self.show_error('Please fill in all fields')
             return
 
         # show loading spinner briefly and attempt login
@@ -407,7 +402,7 @@ class LoginWindow(QMainWindow):
         if user:
             self.login_success.emit(user)
         else:
-            self.show_error('Email ou mot de passe incorrect')
+            self.show_error('Incorrect email or password')
         self.login_button.setEnabled(True)
 
 

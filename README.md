@@ -1,132 +1,135 @@
 # Film Finder
 
-Film Finder est une application de recherche et gestion de films, développée en Python avec PyQt et JSON comme base de données.
-L’application permet aux utilisateurs de proposer des films et aux administrateurs de les valider. Chaque action est historisée dans des logs.
+Film Finder is a Python application built with **PyQt5** that allows users to search, propose, and manage movies.
+Data is stored in **JSON**, and all actions (authentication, film management, admin validation) are logged.
+
+The app supports user authentication, movie searching, admin moderation, poster display, and MP4 trailer playback.
 
 ---
 
-## 🎯 Objectifs du projet
+## Features
 
-- Authentification sécurisée (mot de passe avec majuscule, chiffre, caractère spécial et interdiction du nom dans le mot de passe)
-- Gestion des utilisateurs (admin vs utilisateur normal)
-- Recherche de films par titre, genre, date
-- Gestion des films : ajout, modification, suppression et validation
-- Affichage des films avec poster et lecture de bande-annonce (via flux vidéo MP4)
-- Historique des actions (logs)
-- Stockage des données en JSON
+### Authentication
+
+- Secure password rules (uppercase, number, special char, username not allowed in password)
+- User & Admin roles (inheritance-based models)
+- Registration, login, logout
+- Session management
+- JSON-based user storage
+
+### Movie Management
+
+- Add, edit, delete movies
+- Admin validation
+- Duplicate movie prevention
+- Search by **title**, **genre**, and **release year**
+- Display poster images
+- Trailer playback through MP4 video stream (`QMediaPlayer`)
+- Detailed action logs per movie
+
+### Data Storage (JSON)
+
+- Safe read/write with backup
+- Auto-saving after each modification
+- Error handling on corrupted files
+
+### Testing
+
+- Unit tests for authentication and movie workflows
+- Search feature testing
+- Duplicate detection checks
+- Logs integrity tests
+- Test coverage target ≥ 80%
+- Compatible with `unittest` or `pytest`
+
+### Frontend (PyQt)
+
+- Login screen
+- Movie search interface
+- Movie details window
+- Admin dashboard
+- Poster display widget
+- Video trailer player
+- Full error handling
+- Accessible UI (keyboard navigation, screen-reader-friendly)
+- Responsive layout for multiple resolutions
+
+### Final Touches
+
+- QSS visual styling
+- Included asset library: 20 sample recent movies with posters
+- Complete documentation (English & Portuguese)
+- MIT license
+- Ready for packaging/distribution
 
 ---
 
-## 🏗️ Méthodologie Agile
-
-Nous suivrons la méthodologie **Agile** avec **sprints courts**, itérations et revues fréquentes :
-
-### Sprints proposés
-
-| Sprint | Objecti          | Tâches principales                                                  |
-| ------ | ---------------- | ------------------------------------------------------------------- |
-| 1      | Conception       | UML (cas d’usage, classes), structure JSON, règles métier           |
-| 2      | Backend Auth     | Modèles `User`/`Admin`, `AuthController`, tests login/inscription   |
-| 3      | Backend Films    | Modèle `Film`, `FilmController`, ajout, validation, logs, recherche |
-| 4      | Intégration JSON | Lecture/écriture des fichiers JSON, sauvegarde sécurisée            |
-| 5      | Tests backend    | Test complet du workflow utilisateur/admin, logs et doublons        |
-| 6      | Frontend         | Interface PyQt : login, recherche, détails film, lecture vidéo      |
-| 7      | Finitions        | Ajout posters/trailers, stylisation, README final, tests finaux     |
-
----
-
-## 🛠️ Organisation du projet
+## Project Structure
 
 film_finder/
-├── core/ # Backend : modèles et contrôleurs
-│ ├── models.py
-│ ├── controllers.py
-│ └── database.py
-├── data/ # JSON pour stocker utilisateurs et films
+├── core/
+│ ├── models.py # User, Admin, Movie models
+│ ├── controllers.py # AuthController, FilmController
+│ └── database.py # JSON persistence handler
+├── data/
 │ ├── users.json
 │ └── films.json
-├── assets/ # Images / vidéos
-├── main.py # Point d'entrée de l'application
-├── requirements.txt # Dépendances Python
-└── .gitignore # Fichiers à ignorer par Git
+├── assets/ # Posters, trailers, icons
+├── tests/ # Unit tests
+├── main.py # Application entry point
+├── requirements.txt
+└── README.md
 
 ---
 
-## ⚙️ Tâches principales à faire
+## Installation
 
-1. **Backend Auth**
-   - [x] Implémenter `User` et `Admin` avec héritage
-   - [x] Vérification mot de passe sécurisé
-   - [x] `AuthController` avec `register`, `login`, `logout`
-   - [ ] Tests unitaires pour l’authentification
-   - [x] Gestion des sessions utilisateurs
-2. **Backend Films**
-   - [x] Implémenter `Film` avec `approved`, `added_by_user_id`, `logs`
-   - [x] `FilmController` : ajout, validation, modification, suppression
-   - [ ] Vérifier les doublons avant ajout
-   - [x] Historique des actions (logs)
-   - [x] Recherche par titre, genre, date
-3. **Persistance JSON**
-   - [ ] Lire/écrire `users.json` et `films.json` avec backup
-   - [ ] Sauvegarde automatique après chaque modification
-   - [ ] Gestion des erreurs de lecture/écriture
-4. **Tests backend**
-   - [ ] Tester login, ajout film, validation admin, recherche
-   - [ ] Vérifier logs et gestion doublons
-   - [ ] Couverture de code minimale de 80%
-   - [ ] Utiliser `unittest` ou `pytest`
-5. **Frontend**
-   - [ ] PyQt : login, recherche, détails film
-   - [ ] Lecture vidéo via `QMediaPlayer`
-   - [ ] Affichage poster
-   - [ ] Différencier vues admin/utilisateur
-   - [ ] Gestion des erreurs et messages utilisateur
-   - [ ] Tests d’intégration frontend-backend
-   - [ ] Navigation fluide entre les écrans
-   - [ ] Responsive design pour différentes résolutions
-   - [ ] Accessibilité (support clavier, lecteurs d’écran)
-6. **Finitions**
-   - [ ] Stylisation PyQt (QSS)
-   - [ ] Ajout 20 films récents et posters
-   - [ ] Documentation finale en portugais et en anglais
-   - [ ] Tests finaux de bout en bout
-   - [ ] Préparation pour déploiement
-   - [ ] Revue de code et nettoyage
-   - [ ] Création du README final
-   - [ ] Licence MIT
-
----
-
-## 📝 Instructions pratiques
-
-### Créer un environnement Python
+### 1. Create & activate a virtual environment
 
 ```bash
-python -m venv venv # Crée un environnement virtuel
-source venv/bin/activate  # Windows : venv\Scripts\activate
-pip install -r requirements.txt # Installe les dépendances
+python -m venv venv
+# Windows:
+venv\Scripts\activate
+# Linux/macOS:
+source venv/bin/activate
 ```
 
-### Lancer l'application
+### 2. Install dependencies
+
+```bash
+pip install -r requirements.txt
+```
+
+### 3. Run the application
 
 ```bash
 python main.py
 ```
 
-### Exécuter les tests
+## Agile Methodology
 
-```bash
-python -m unittest discover tests
-```
+Film Finder follows an Agile workflow with short sprints and iterative refinement.
 
----
+🗂️ Sprint Overview
+Sprint Objective Key Tasks
+1 Design UML, JSON structure, business rules
+2 Auth Backend User/Admin models, AuthController, secure passwords
+3 Movie Backend Movie model, controller, logs, search
+4 JSON Persistence Read/write, autosave, backups
+5 Backend Testing Full workflow tests, duplicates, logs
+6 Frontend PyQt UI screens, video, admin/user separation
+7 Finalization Styling, assets, docs, end-to-end tests, packaging
 
-## 🤝 Contribution
+## Contribution
 
-Aucune contribution externe n'est prévue pour ce projet, mais les suggestions sont les bienvenues !
+This is currently a closed project, but suggestions and improvement ideas are welcome.
 
----
+## License
 
-## 📄 Licences
+This project is licensed under the MIT License.
+Refer to the LICENSE file for full details.
 
-Ce projet est sous licence MIT. Voir le fichier LICENSE pour plus de détails.
+## Author
+
+Film Finder — 2025
+Developed with passion using Python, PyQt, and JSON.
